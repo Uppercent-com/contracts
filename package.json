@@ -1,0 +1,22 @@
+{
+  "name": "uppercent",
+  "version": "1.0.0",
+  "description": "ERC1155 Smart Contract to build NFT Passes for Uppercent",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ERC1155"
+  ],
+  "author": "Novvr Technologies",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "@openzeppelin/hardhat-upgrades": "^2.4.1",
+    "hardhat": "^2.19.0"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts-upgradeable": "^5.0.0"
+  }
+}

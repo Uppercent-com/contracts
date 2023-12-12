@@ -8,18 +8,18 @@ async function main() {
 
   const UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
   const uppercentNFTPass = await upgrades.deployProxy(UppercentNFTPass, [
-    "0xbef6149880......737D38844c", // owner
-    "0xc5eCcd259C......139E4c315f", // creator
+    "0xB47FbC5E6996F6766C4860b360e883dD22Cd4f9a", // owner
+    "0x55B12b8F15AD19655426A9F619C3C7672B32644A", // creator
     5, // admin earning
     5, // creator earning
     "ipfs://bafkreibxocxxlakbmd2nrllnpszhfzcwzry5jwdplfljpfeyjgeptnujlm", // URI
-    100, // maxSupply
-    2000000000000000, // mintPrice
+    10000, // maxSupply
+    4000000000000000000n, // mintPrice
     10 // per user mint limit
   ], { initializer: "initialize" });
 
   await uppercentNFTPass.waitForDeployment();
-  //await uppercentNFTPass.deployed();
+  await uppercentNFTPass.deployed();
 
   console.log("UppercentNFTPass deployed to:", uppercentNFTPass.address);
 }

@@ -17,6 +17,10 @@ import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155Burn
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155SupplyUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+// to get data feed for Flare/Coston/Coston2
+import "@flarenetwork/flare-periphery-contracts/coston/util-contracts/userInterfaces/IFlareContractRegistry.sol";
+import "@flarenetwork/flare-periphery-contracts/coston/ftso/userInterfaces/IFtsoRegistry.sol";
+
 
 /**
  * 
@@ -47,6 +51,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
     uint256 private _presaleTotalSupply;
     uint256 private _userMintLimit;
     bool private _presaleCreated;
+    address private constant FLARE_CONTRACT_REGISTRY = 0xaD67FE66660Fb8dFE9d6b1b4240d8650e30F6019;
 
     // Event for presale creation
     event PresaleCreated(uint256 supply, uint256 price, uint256 startDate, uint256 endDate);
@@ -280,6 +285,24 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
      */
     function getUserMintLimit(address user, uint256 id) public view virtual returns (uint256) {
         return _userMintLimit - balanceOf(user, id);
+    }
+
+    function getPriceinWei(string memory _symbol) public view returns (uint256) {
+        // access the contract registry
+        IFlareContractRegistry contractRegistry = IFlareContractRegistry(
+            FLARE_CONTRACT_REGISTRY
+        );
+
+        // retrieve the FTSO registry
+        IFtsoRegistry ftsoRegistry = IFtsoRegistry(
+            contractRegistry.getContractAddressByName("FtsoRegistry")
+        );
+
+        // get latest price
+        (uint256 _price, , uint256 _decimals) = ftsoRegistry
+            .getCurrentPriceWithDecimals(_symbol);
+
+        return uint256((_price * (10 ** (18 - _decimals))) / 1e18);
     }
 
     function _authorizeUpgrade(address newImplementation) internal onlyOwner override {}

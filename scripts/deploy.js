@@ -2,9 +2,6 @@
 const { ethers, upgrades } = require("hardhat");
 
 async function main() {
-  //const [deployer] = await ethers.getSigners();
-
-  //console.log("Deploying contracts with the account:", deployer.address);
 
   const UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
   const uppercentNFTPass = await upgrades.deployProxy(UppercentNFTPass, [
@@ -19,9 +16,8 @@ async function main() {
   ], { initializer: "initialize" });
 
   await uppercentNFTPass.waitForDeployment();
-  await uppercentNFTPass.deployed();
 
-  console.log("UppercentNFTPass deployed to:", uppercentNFTPass.address);
+  console.log("UppercentNFTPass deployed to:", await uppercentNFTPass.getAddress());
 }
 
 main()

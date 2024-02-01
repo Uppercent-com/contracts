@@ -44,17 +44,33 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
     uint256 private _adminEarning;
     uint256 private _creatorEarning;
     uint256 private _mintPrice;
+    // Pre-sale state variable
     uint256 private _presaleMintPrice;
     uint256 private _presaleStartDate;
     uint256 private _presaleEndDate;
     uint256 private _presaleMaxSupply;
     uint256 private _presaleTotalSupply;
-    uint256 private _userMintLimit;
     bool private _presaleCreated;
+    // Allow list state variables
+    uint256 private _allowListPrice;
+    uint256 private _allowListStartDate;
+    uint256 private _allowListEndDate;
+    uint256 private _allowListMaxLimit;
+    bool private _allowListExists;
+    uint256 private _totalReservedSupply;
+    uint256 private _allowListDeposit;
+
+    uint256 private _userMintLimit;
     address private constant FLARE_CONTRACT_REGISTRY = 0xaD67FE66660Fb8dFE9d6b1b4240d8650e30F6019;
+
+    mapping(address => uint256) private earnings;
+    mapping(address => uint256) private allowListBalances;
+    mapping(address => uint256) private reservedNFTPasses;
 
     // Event for presale creation
     event PresaleCreated(uint256 supply, uint256 price, uint256 startDate, uint256 endDate);
+    event AllowListCreated(uint256 limit, uint256 price, uint256 startDate, uint256 endDate);
+    event AllowListSubscribed(address indexed account, uint256 amount);
 
     // Modifier to allow execution only once
     modifier onlyOnce() {
@@ -94,6 +110,8 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
         _adminEarning = adminEarning;
         _creatorEarning = creatorEarning;
         _userMintLimit = userMintLimit;
+        _presaleCreated = false;
+        _allowListExists = false;
     }
 
     /**
@@ -128,9 +146,10 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
         // Check various conditions before allowing minting
         require(!isPresaleActive(), "Error: Pre-sale in Progress");
         require(amount <= getUserMintLimit(msg.sender, TOKEN_ID), "Error: Exceeds per-user limit");
-        require(totalSupply(TOKEN_ID) + amount <= _maxSupply, "Error: Exceeds maximum supply");
-        require(msg.value >= getMintPrice() * amount, "Error: Insufficient amount sent");
+        require(totalSupply(TOKEN_ID) + amount <= maxAavailableSupply(msg.sender), "Error: Exceeds maximum supply");
+        require(msg.value >= requiredMintAmount(amount, msg.sender), "Error: Insufficient amount sent");
 
+        adjustReservations(amount, msg.sender);
         // Mint NFTs, transfer earnings, and update user's pass count
         _mint(msg.sender, TOKEN_ID, amount, "");
     }
@@ -141,15 +160,18 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
      */
     function presaleMint(uint256 amount) public payable {
         // Check various conditions before allowing minting
+
         require(isPresaleActive(), "Error: No active pre-sale");
-        require(totalSupply(TOKEN_ID) + amount <= _maxSupply, "Error: Exceeds maximum supply");
-        require(_presaleTotalSupply + amount <= _presaleMaxSupply, "Error: Exceeds pre-sale supply");
+        require(totalSupply(TOKEN_ID) + amount <= maxAavailableSupply(msg.sender), "Error: Exceeds maximum supply");
+        require(_presaleTotalSupply + amount <= maxAavailableSupplyPresale(msg.sender), "Error: Exceeds pre-sale supply");
         require(amount <= getUserMintLimit(msg.sender, TOKEN_ID), "Error: Exceeds per-user limit");
-        require(msg.value >= getMintPrice() * amount, "Error: Insufficient amount sent");
+        require(msg.value >= requiredMintAmount(amount, msg.sender), "Error: Insufficient amount sent");
+
+        adjustReservations(amount, msg.sender);
+        _presaleTotalSupply += amount;
 
         // Mint NFTs, transfer earnings, and update user's pass count
         _mint(msg.sender, TOKEN_ID, amount, "");
-        _presaleTotalSupply += amount;
     }
 
     /**
@@ -186,9 +208,62 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
         uint256 adminShare = (address(this).balance * _adminEarning) / 100;
         uint256 creatorShare = (address(this).balance * _creatorEarning) / 100;
 
+        // Record earnings
+        earnings[_admin] += adminShare;
+        earnings[_creator] += creatorShare;
+
         // Transfer funds to admin and creator
         payable(_admin).transfer(adminShare);
         payable(_creator).transfer(creatorShare);
+    }
+
+    /**
+     * Function that calculates required mint amount to mint NFT pass
+     * @ amount is number of NFTs
+     * @ account is wallet address
+     */
+    function requiredMintAmount(uint256 amount, address account) public view virtual returns (uint256) {
+        uint256 mintPrice = getMintPrice();
+        uint256 discountedPrice = mintPrice - _allowListPrice;
+        uint256 reqAmount;
+
+        if (reservedNFTPasses[account] > 0 && amount > 0) {
+            uint256 reservedPasses = min(amount, reservedNFTPasses[account]);
+            uint256 regularPasses = amount - reservedPasses;
+
+            reqAmount = discountedPrice * reservedPasses + mintPrice * regularPasses;
+        } else {
+            reqAmount = mintPrice * amount;
+        }
+
+        return reqAmount;
+    }
+
+    /**
+     * Helper function to get the minimum of two numbers
+     */
+    function min(uint256 a, uint256 b) internal pure returns (uint256) {
+        return a < b ? a : b;
+    }
+    
+    /**
+     * max unlocked supply for regular minting
+     * @ account is the sender wallet address
+     */
+    function maxAavailableSupply(address account) internal view returns (uint256){
+        uint256 _maxAavailable = _maxSupply - _totalReservedSupply;
+        uint256 _availableForUser = _maxAavailable + reservedNFTPasses[account];
+        return _availableForUser;
+    }
+
+    /**
+     * max unlocked supply for pre-sale minting
+     * @ account is the sender wallet address
+     */
+    function maxAavailableSupplyPresale(address account) internal view returns (uint256){
+        uint256 _maxAavailable = _presaleMaxSupply - _totalReservedSupply;
+        uint256 _availableForUser = _maxAavailable + reservedNFTPasses[account];
+        return _availableForUser;
     }
 
     /**
@@ -198,6 +273,14 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
     function isPresaleActive() public view virtual returns (bool) {
         return block.timestamp >= _presaleStartDate && block.timestamp <= _presaleEndDate;
     }
+
+    /**
+     * 
+     * Function to check if presale is created
+     */
+    function isPresaleCreated() public view virtual returns (bool) {
+        return _presaleCreated;
+    }
  
     /**
      * 
@@ -206,7 +289,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
     function closePresale() public onlyOwner {
         _presaleEndDate = block.timestamp;
     }
-
+    
     /**
      * 
      * Get maximum supply of token
@@ -236,6 +319,14 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
      */
     function getCreatorShare() public view virtual returns (uint256) {
         return _creatorEarning;
+    }
+
+    /**
+     * 
+     * Get creator & admin earnings
+     */
+    function getEarnings(address account) public view virtual returns (uint256) {
+        return earnings[account];
     }
 
     /**
@@ -287,6 +378,10 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
         return _userMintLimit - balanceOf(user, id);
     }
 
+    /**
+     * 
+     * FTSO Integration
+     */
     function getPriceinWei(string memory _symbol) public view returns (uint256) {
         // access the contract registry
         IFlareContractRegistry contractRegistry = IFlareContractRegistry(
@@ -303,6 +398,148 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
             .getCurrentPriceWithDecimals(_symbol);
 
         return uint256((_price * (10 ** (18 - _decimals))) / 1e18);
+    }
+
+/////////////////////////////////////////////////////////    
+//     ___    ____                 __    _      __     //
+//    /   |  / / /___ _      __   / /   (_)____/ /_    //
+//   / /| | / / / __ \ | /| / /  / /   / / ___/ __/    //  
+//  / ___ |/ / / /_/ / |/ |/ /  / /___/ (__  ) /_      //
+// /_/  |_/_/_/\____/|__/|__/  /_____/_/____/\__/      //
+//                                                     //
+/////////////////////////////////////////////////////////
+
+    /**
+     * 
+     * Function for the owner to set an allow list
+     */
+    function setAllowList(
+        uint256 limit,
+        uint256 price,
+        uint256 startDate,
+        uint256 endDate
+    ) public onlyOwner {
+        require(!allowListExits(), "Error: Allow list exists");
+        require(!isPresaleActive(), "Error: No Allow list when pre-sale is active");
+        require(totalSupply(TOKEN_ID) + limit <= _maxSupply, "Error: Allow list supply exceeds max supply");
+        require(price > 0, "Error: Price must be greater than zero");
+        require(startDate < endDate, "Error: Invalid dates");
+
+        // Set presale parameters
+        _allowListMaxLimit = limit;
+        _allowListPrice = price;
+        _allowListStartDate = startDate;
+        _allowListEndDate = endDate;
+        _allowListExists = true;
+
+        // Emit event for allow list creation
+        emit AllowListCreated(limit, price, startDate, endDate);
+    }
+
+    /**
+     * 
+     * Function for the users to subscribe to an allow list
+     */
+    function subscribeAllowList(uint256 amount) public payable {
+        uint256 userLimit = _userMintLimit-reservedNFTPasses[msg.sender];
+        require(allowListExits() && isAllowListActive(), "Error: No allow list exists");
+        require(!isPresaleActive(), "Error: Cannot subscribe when pre-sale is live");
+        require(amount>0, "Error: Subscribe to at least 1 NFT pass");
+        require(amount <= (_allowListMaxLimit-_totalReservedSupply), "Error: Exceeds maximum allowed list limit");
+        require(amount <= userLimit, "Error: Exceeds per-user limit");
+        require(msg.value >= _allowListPrice * amount, "Error: Insufficient amount sent");
+
+        allowListBalances[msg.sender] += msg.value;
+        reservedNFTPasses[msg.sender] += amount;
+        _totalReservedSupply += amount;
+        _allowListDeposit += msg.value;
+
+        // Emit event for allow list subscription
+        emit AllowListSubscribed(msg.sender, amount);
+
+    }
+
+    /**
+     * Adjust NFT passes reservations
+     */
+    function adjustReservations(uint256 amount, address account) internal {
+        uint256 reservedPasses = min(amount, reservedNFTPasses[account]);
+        reservedNFTPasses[account] -= reservedPasses;
+        allowListBalances[account] -= reservedPasses * _allowListPrice;
+        _totalReservedSupply -= reservedPasses;
+    }
+
+    /**
+     * 
+     * Function to check if allow list exists
+     */
+    function allowListExits() public view virtual returns (bool) {
+        return _allowListExists;
+    }
+
+    /**
+     * 
+     * Function to check if allow list is active
+     */
+    function isAllowListActive() public view virtual returns (bool) {
+        return block.timestamp >= _allowListStartDate && block.timestamp <= _allowListEndDate;
+    }
+
+    /**
+     * Returns supply of total reserved NFT passes
+     */
+    function getTotalReservedPasses() public view virtual returns (uint256) {
+        return _totalReservedSupply;
+    }
+
+    /**
+     * Returns user reserved NFT passes
+     */
+    function getUserReservedPasses(address account) public view virtual returns (uint256) {
+        return reservedNFTPasses[account];
+    }
+
+    /**
+     * Returns total deposit for allow list
+     */
+    function getAllowListDeposit() public view virtual returns (uint256) {
+        return _allowListDeposit;
+    }
+
+    /**
+     * Returns max limit for allow list
+     */
+    function getAllowListMaxLimit() public view virtual returns (uint256) {
+        return _allowListMaxLimit;
+    }
+
+    /**
+     * Returns allow list price
+     */
+    function getAllowListPrice() public view virtual returns (uint256) {
+        return _allowListPrice;
+    }
+    
+    /**
+     * Returns start date of allow list
+     */
+    function getAllowListStartDate() public view virtual returns (uint256) {
+        return _allowListStartDate;
+    }
+
+    /**
+     * Returns end date of allow list
+     */
+    function getAllowListEndDate() public view virtual returns (uint256) {
+        return _allowListEndDate;
+    }
+
+    /**
+     * 
+     * Function to close allow list window
+     */
+    function closeAllowList() public onlyOwner {
+        _allowListEndDate = block.timestamp;
     }
 
     function _authorizeUpgrade(address newImplementation) internal onlyOwner override {}

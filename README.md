@@ -104,8 +104,8 @@ When auditing the contract, focus on the following areas:
 
 For any questions, feedback, or bug reports, please contact the project maintainers:
 
-- Email: [pawan@novvr.com](mailto:pawan@novvr.com)
-- Email: [laxman@novvr.com](mailto:laxman@novvr.com)
+# - Email: [pawan@novvr.com](mailto:pawan@novvr.com)
+# - Email: [laxman@novvr.com](mailto:laxman@novvr.com)
 
 ## **License**
 

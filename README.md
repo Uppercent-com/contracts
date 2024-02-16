@@ -100,13 +100,6 @@ When auditing the contract, focus on the following areas:
 - Ensure correct configuration of contract parameters.
 - Check the logic for releasing funds to the admin and creator.
 
-## **Contact Information**
-
-For any questions, feedback, or bug reports, please contact the project maintainers:
-
-# - Email: [pawan@novvr.com](mailto:pawan@novvr.com)
-# - Email: [laxman@novvr.com](mailto:laxman@novvr.com)
-
 ## **License**
 
 This smart contract is released under the MIT License. See the LICENSE file for more details.

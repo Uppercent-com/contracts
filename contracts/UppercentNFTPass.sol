@@ -18,8 +18,8 @@ import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155Supp
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 // to get data feed for Flare/Coston/Coston2
-import "@flarenetwork/flare-periphery-contracts/coston/util-contracts/userInterfaces/IFlareContractRegistry.sol";
-import "@flarenetwork/flare-periphery-contracts/coston/ftso/userInterfaces/IFtsoRegistry.sol";
+import "@flarenetwork/flare-periphery-contracts/coston2/util-contracts/userInterfaces/IFlareContractRegistry.sol";
+import "@flarenetwork/flare-periphery-contracts/coston2/ftso/userInterfaces/IFtsoRegistry.sol";
 
 
 /**
@@ -36,6 +36,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
      * Hence token ID is fixed to '0'
      */
     uint256 public constant TOKEN_ID = 0;
+    string private constant TOKEN_SYMBOL = "C2FLR"; // for FTSO
 
     // State variables for contract parameters
     uint256 private _maxSupply;
@@ -48,6 +49,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
     uint256 private _presaleMintPrice;
     uint256 private _presaleStartDate;
     uint256 private _presaleEndDate;
+    uint256 private _firstPresaleWindow;
     uint256 private _presaleMaxSupply;
     uint256 private _presaleTotalSupply;
     bool private _presaleCreated;
@@ -79,6 +81,18 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
         _presaleCreated = true;
     }
 
+    // Modifier to allow execution only during the first pre-sale window (default: 7 days) for allow-list users
+    modifier onlyDuringFirst7Days() {
+        require(
+            // Check if it's within the first pre-sale window and the sender is on the allow-list
+            (isFirstPresaleWindow() && reservedNFTPasses[msg.sender]>0) ||
+            // Or if it's after the first pre-sale window
+            (isPresaleActive() && (!allowListExits() || block.timestamp > (_presaleStartDate + _firstPresaleWindow))),
+            "Error: First pre-sale window is for allowed list or no active pre-sale"
+        );
+        _;
+    }
+
     /**
      * 
      * Initialize function to set up the contract parameters
@@ -104,7 +118,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
 
         // Set contract parameters
         _maxSupply = maxSupply;
-        _mintPrice = mintPrice;
+        _mintPrice = mintPrice; // $USD
         _creator = creator;
         _admin = owner;
         _adminEarning = adminEarning;
@@ -112,6 +126,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
         _userMintLimit = userMintLimit;
         _presaleCreated = false;
         _allowListExists = false;
+        _firstPresaleWindow = 7 days;
     }
 
     /**
@@ -146,7 +161,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
         // Check various conditions before allowing minting
         require(!isPresaleActive(), "Error: Pre-sale in Progress");
         require(amount <= getUserMintLimit(msg.sender, TOKEN_ID), "Error: Exceeds per-user limit");
-        require(totalSupply(TOKEN_ID) + amount <= maxAavailableSupply(msg.sender), "Error: Exceeds maximum supply");
+        require(totalSupply(TOKEN_ID) + amount <= maxAavailableSupply(msg.sender, _maxSupply), "Error: Exceeds maximum supply");
         require(msg.value >= requiredMintAmount(amount, msg.sender), "Error: Insufficient amount sent");
 
         adjustReservations(amount, msg.sender);
@@ -158,12 +173,12 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
      * 
      * Function to mint NFTs during pre-sale window
      */
-    function presaleMint(uint256 amount) public payable {
+    function presaleMint(uint256 amount) public onlyDuringFirst7Days payable {
         // Check various conditions before allowing minting
 
         require(isPresaleActive(), "Error: No active pre-sale");
-        require(totalSupply(TOKEN_ID) + amount <= maxAavailableSupply(msg.sender), "Error: Exceeds maximum supply");
-        require(_presaleTotalSupply + amount <= maxAavailableSupplyPresale(msg.sender), "Error: Exceeds pre-sale supply");
+        require(totalSupply(TOKEN_ID) + amount <= maxAavailableSupply(msg.sender, _maxSupply), "Error: Exceeds maximum supply");
+        require(_presaleTotalSupply + amount <= maxAavailableSupply(msg.sender, _presaleMaxSupply), "Error: Exceeds pre-sale supply");
         require(amount <= getUserMintLimit(msg.sender, TOKEN_ID), "Error: Exceeds per-user limit");
         require(msg.value >= requiredMintAmount(amount, msg.sender), "Error: Insufficient amount sent");
 
@@ -191,7 +206,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
 
         // Set presale parameters
         _presaleMaxSupply = supply;
-        _presaleMintPrice = price;
+        _presaleMintPrice = price; // $USD
         _presaleStartDate = startDate;
         _presaleEndDate = endDate;
 
@@ -236,7 +251,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
             reqAmount = mintPrice * amount;
         }
 
-        return reqAmount;
+        return dollarToWei(TOKEN_SYMBOL, reqAmount);
     }
 
     /**
@@ -250,19 +265,16 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
      * max unlocked supply for regular minting
      * @ account is the sender wallet address
      */
-    function maxAavailableSupply(address account) internal view returns (uint256){
-        uint256 _maxAavailable = _maxSupply - _totalReservedSupply;
-        uint256 _availableForUser = _maxAavailable + reservedNFTPasses[account];
-        return _availableForUser;
-    }
-
-    /**
-     * max unlocked supply for pre-sale minting
-     * @ account is the sender wallet address
-     */
-    function maxAavailableSupplyPresale(address account) internal view returns (uint256){
-        uint256 _maxAavailable = _presaleMaxSupply - _totalReservedSupply;
-        uint256 _availableForUser = _maxAavailable + reservedNFTPasses[account];
+    function maxAavailableSupply(address account, uint256 supply) internal view returns (uint256){
+        uint256 totalReservedSupply = _totalReservedSupply;
+        uint256 userReserved = reservedNFTPasses[account];
+        // reservations are void after 7 days of pre-sale
+        if(!isFirstPresaleWindow()){
+            totalReservedSupply = 0;
+            userReserved = 0;
+        }
+        uint256 _maxAavailable = supply - totalReservedSupply;
+        uint256 _availableForUser = _maxAavailable + userReserved;
         return _availableForUser;
     }
 
@@ -272,6 +284,13 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
      */
     function isPresaleActive() public view virtual returns (bool) {
         return block.timestamp >= _presaleStartDate && block.timestamp <= _presaleEndDate;
+    }
+
+    /**
+     * returns true during first pre-sale window (default: 7 days)
+     */
+    function isFirstPresaleWindow() public view virtual returns (bool) {
+        return (isPresaleActive() && allowListExits() && block.timestamp >= _presaleStartDate && block.timestamp <= (_presaleStartDate + _firstPresaleWindow));
     }
 
     /**
@@ -382,22 +401,36 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
      * 
      * FTSO Integration
      */
-    function getPriceinWei(string memory _symbol) public view returns (uint256) {
-        // access the contract registry
+    function getTokenPriceWei(
+        string memory _symbol
+    ) public view returns(
+        uint256 _price, uint256 _timestamp, uint256 _decimals)
+    {
+        // 2. Access the Contract Registry
         IFlareContractRegistry contractRegistry = IFlareContractRegistry(
-            FLARE_CONTRACT_REGISTRY
-        );
+            FLARE_CONTRACT_REGISTRY);
 
-        // retrieve the FTSO registry
+        // 3. Retrieve the FTSO Registry
         IFtsoRegistry ftsoRegistry = IFtsoRegistry(
-            contractRegistry.getContractAddressByName("FtsoRegistry")
-        );
+            contractRegistry.getContractAddressByName('FtsoRegistry'));
 
-        // get latest price
-        (uint256 _price, , uint256 _decimals) = ftsoRegistry
-            .getCurrentPriceWithDecimals(_symbol);
+        // 4. Get latest price
+        (_price, _timestamp, _decimals) =
+            ftsoRegistry.getCurrentPriceWithDecimals(_symbol);
+    }
 
-        return uint256((_price * (10 ** (18 - _decimals))) / 1e18);
+    function weiToDollar(string memory _symbol, uint256 _amount) public view returns (uint256 _price){
+        uint256 _timestamp;
+        uint256 _decimals;
+        (_price, _timestamp, _decimals) = getTokenPriceWei(_symbol);
+        return uint256(((_price * (10 ** (18 - _decimals))) * _amount) / 1e18);
+    }
+
+    function dollarToWei(string memory _symbol, uint256 _amount) public view returns (uint256 _price){
+        uint256 _timestamp;
+        uint256 _decimals;
+        (_price, _timestamp, _decimals) = getTokenPriceWei(_symbol);
+        return uint256((_amount * (10 ** (18 + _decimals)))/_price);
     }
 
 /////////////////////////////////////////////////////////    
@@ -427,13 +460,22 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
 
         // Set presale parameters
         _allowListMaxLimit = limit;
-        _allowListPrice = price;
+        _allowListPrice = price; // $USD
         _allowListStartDate = startDate;
         _allowListEndDate = endDate;
         _allowListExists = true;
 
         // Emit event for allow list creation
         emit AllowListCreated(limit, price, startDate, endDate);
+    }
+
+    /**
+     * 
+     * set first presale window (default is 7 days)
+     */
+    function setFirstPresaleWindow(uint256 firstPresaleWindow) public onlyOwner {
+        require(firstPresaleWindow > 0 && firstPresaleWindow <= _presaleEndDate, "Error: Invalid first pre-sale window");
+        _firstPresaleWindow = firstPresaleWindow;
     }
 
     /**
@@ -447,7 +489,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
         require(amount>0, "Error: Subscribe to at least 1 NFT pass");
         require(amount <= (_allowListMaxLimit-_totalReservedSupply), "Error: Exceeds maximum allowed list limit");
         require(amount <= userLimit, "Error: Exceeds per-user limit");
-        require(msg.value >= _allowListPrice * amount, "Error: Insufficient amount sent");
+        require(msg.value >= dollarToWei(TOKEN_SYMBOL, _allowListPrice * amount), "Error: Insufficient amount sent");
 
         allowListBalances[msg.sender] += msg.value;
         reservedNFTPasses[msg.sender] += amount;
@@ -462,10 +504,9 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
     /**
      * Adjust NFT passes reservations
      */
-    function adjustReservations(uint256 amount, address account) internal {
-        uint256 reservedPasses = min(amount, reservedNFTPasses[account]);
-        reservedNFTPasses[account] -= reservedPasses;
-        allowListBalances[account] -= reservedPasses * _allowListPrice;
+    function adjustReservations(uint256 amount, address sender) internal {
+        uint256 reservedPasses = min(amount, reservedNFTPasses[sender]);
+        reservedNFTPasses[sender] -= reservedPasses;
         _totalReservedSupply -= reservedPasses;
     }
 
@@ -489,14 +530,14 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
      * Returns supply of total reserved NFT passes
      */
     function getTotalReservedPasses() public view virtual returns (uint256) {
-        return _totalReservedSupply;
+        return (isPresaleCreated() && block.timestamp > (_presaleStartDate + _firstPresaleWindow))?0:_totalReservedSupply;
     }
 
     /**
      * Returns user reserved NFT passes
      */
     function getUserReservedPasses(address account) public view virtual returns (uint256) {
-        return reservedNFTPasses[account];
+        return (isPresaleCreated() && block.timestamp > (_presaleStartDate + _firstPresaleWindow))?0:reservedNFTPasses[account];
     }
 
     /**
@@ -532,6 +573,13 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
      */
     function getAllowListEndDate() public view virtual returns (uint256) {
         return _allowListEndDate;
+    }
+
+    /**
+     * Return first presale window (exclusive for allow listed users)
+     */
+    function  getFirstPresaleWindow() public view virtual returns (uint256) {
+        return _firstPresaleWindow;
     }
 
     /**

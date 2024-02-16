@@ -11,7 +11,7 @@ async function main() {
     5, // creator earning
     "ipfs://bafkreibxocxxlakbmd2nrllnpszhfzcwzry5jwdplfljpfeyjgeptnujlm", // URI
     10000, // maxSupply
-    4000000000000000000n, // mintPrice
+    4, // mintPrice
     10 // per user mint limit
   ], { initializer: "initialize" });
 

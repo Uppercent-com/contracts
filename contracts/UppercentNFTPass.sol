@@ -139,6 +139,46 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
 
     /**
      * 
+     * Function to change admin address
+     */
+    function changeAdmin(address newAdmin) public onlyOwner {
+        // Check for address 0
+        require(newAdmin !=  address(0), "Error:  address");
+        _admin = newAdmin;
+    }
+
+    /**
+     * 
+     * Function to change creator address
+     */
+    function changeCreator(address newCreator) public onlyOwner {
+        // Check for address 0
+        require(newCreator !=  address(0), "Error: Invalid address");
+        _creator = newCreator;
+    }
+
+    /**
+     * @dev Function to update the percentage of earnings the creator should receive.
+     * @param percentage The percentage of earnings to be allocated to the creator.
+     */
+    function updateCreatorsShare(uint256 percentage) public onlyOwner {
+        // Check for address 0
+        require(percentage > 0, "Error: Invalid percentage");
+        _creatorEarning = percentage;
+    }
+
+    /**
+     * @dev Function to update the percentage of earnings the admin should receive.
+     * @param percentage The percentage of earnings to be allocated to the admin.
+     */
+    function updateAdminsShare(uint256 percentage) public onlyOwner {
+        // Check for address 0
+        require(percentage > 0, "Error: Invalid percentage");
+        _adminEarning = percentage;
+    }
+
+    /**
+     * 
      * Function to pause the contract
      */
     function pause() public onlyOwner {
@@ -419,13 +459,19 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
             ftsoRegistry.getCurrentPriceWithDecimals(_symbol);
     }
 
+    /**
+     * Convert wei to dollar
+     */
     function weiToDollar(string memory _symbol, uint256 _amount) public view returns (uint256 _price){
         uint256 _timestamp;
         uint256 _decimals;
         (_price, _timestamp, _decimals) = getTokenPriceWei(_symbol);
-        return uint256(((_price * (10 ** (18 - _decimals))) * _amount) / 1e18);
+        return uint256((_price * _amount) / (10 ** (18 + _decimals)));
     }
 
+    /**
+     * Convert dollar to wei
+     */
     function dollarToWei(string memory _symbol, uint256 _amount) public view returns (uint256 _price){
         uint256 _timestamp;
         uint256 _decimals;

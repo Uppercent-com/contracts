@@ -164,6 +164,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
     function updateCreatorsShare(uint256 percentage) public onlyOwner {
         // Check for address 0
         require(percentage > 0, "Error: Invalid percentage");
+        require(percentage+_adminEarning <= 100, "Error: Cumulative share value can not be greater than 100");
         _creatorEarning = percentage;
     }
 
@@ -174,6 +175,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
     function updateAdminsShare(uint256 percentage) public onlyOwner {
         // Check for address 0
         require(percentage > 0, "Error: Invalid percentage");
+        require(percentage+_creatorEarning <= 100, "Error: Cumulative share value can not be greater than 100");
         _adminEarning = percentage;
     }
 
@@ -242,6 +244,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
     ) public onlyOwner onlyOnce {
         require(totalSupply(TOKEN_ID) + supply <= _maxSupply, "Error: Presale supply exceeds max supply");
         require(price > 0, "Error: Presale price must be greater than zero");
+        require(startDate > block.timestamp, "Error: Start date can not be set to past date");
         require(startDate < endDate, "Error: Invalid presale dates");
 
         // Set presale parameters
@@ -502,6 +505,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
         require(!isPresaleActive(), "Error: No Allow list when pre-sale is active");
         require(totalSupply(TOKEN_ID) + limit <= _maxSupply, "Error: Allow list supply exceeds max supply");
         require(price > 0, "Error: Price must be greater than zero");
+        require(startDate > block.timestamp, "Error: Start date can not be set to past date");
         require(startDate < endDate, "Error: Invalid dates");
 
         // Set presale parameters

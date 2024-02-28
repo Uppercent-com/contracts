@@ -32,15 +32,15 @@ module.exports = {
   },
   etherscan: {
     apiKey: {
-      coston2: [etherscanKey]
+      songbird: [etherscanKey]
     },
     customChains: [
       {
-        network: "coston2",
-        chainId: 114,
+        network: "songbird",
+        chainId: 19,
         urls: {
-          apiURL: "https://coston2-explorer.flare.network/api",
-          browserURL: "https://coston2-explorer.flare.network/"
+          apiURL: "https://songbird-explorer.flare.network/api",
+          browserURL: "https://songbird-explorer.flare.network/"
         }
       }
     ]

@@ -17,9 +17,9 @@ import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155Burn
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155SupplyUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-// to get data feed for Flare/Coston/Coston2
-import "@flarenetwork/flare-periphery-contracts/coston2/util-contracts/userInterfaces/IFlareContractRegistry.sol";
-import "@flarenetwork/flare-periphery-contracts/coston2/ftso/userInterfaces/IFtsoRegistry.sol";
+// to get data feed for Flare/Coston/Coston2/Songbird
+import "@flarenetwork/flare-periphery-contracts/songbird/util-contracts/userInterfaces/IFlareContractRegistry.sol";
+import "@flarenetwork/flare-periphery-contracts/songbird/ftso/userInterfaces/IFtsoRegistry.sol";
 
 
 /**
@@ -36,7 +36,7 @@ contract UppercentNFTPass is Initializable, ERC1155Upgradeable, OwnableUpgradeab
      * Hence token ID is fixed to '0'
      */
     uint256 public constant TOKEN_ID = 0;
-    string private constant TOKEN_SYMBOL = "C2FLR"; // for FTSO
+    string private constant TOKEN_SYMBOL = "SGB"; // for FTSO
 
     // State variables for contract parameters
     uint256 private _maxSupply;

@@ -46,10 +46,8 @@ contract UppercentNFTPass is
 
     // State variables for contract parameters
     uint256 private _maxSupply;
-    address private _creator;
     address private _admin;
     uint256 private _adminEarning;
-    uint256 private _creatorEarning;
     uint256 private _mintPrice;
     // Pre-sale state variable
     uint256 private _presaleMintPrice;
@@ -119,9 +117,7 @@ contract UppercentNFTPass is
      */
     function initialize(
         address owner,
-        address creator,
         uint256 adminEarning,
-        uint256 creatorEarning,
         string memory uri,
         uint256 maxSupply,
         uint256 mintPrice,
@@ -138,10 +134,8 @@ contract UppercentNFTPass is
         // Set contract parameters
         _maxSupply = maxSupply;
         _mintPrice = mintPrice; // $USD
-        _creator = creator;
         _admin = owner;
         _adminEarning = adminEarning;
-        _creatorEarning = creatorEarning;
         _userMintLimit = userMintLimit;
         _presaleCreated = false;
         _allowListExists = false;
@@ -167,40 +161,12 @@ contract UppercentNFTPass is
     }
 
     /**
-     *
-     * Function to change creator address
-     */
-    function changeCreator(address newCreator) public onlyOwner {
-        // Check for address 0
-        require(newCreator != address(0), "Error: Invalid address");
-        _creator = newCreator;
-    }
-
-    /**
-     * @dev Function to update the percentage of earnings the creator should receive.
-     * @param percentage The percentage of earnings to be allocated to the creator.
-     */
-    function updateCreatorsShare(uint256 percentage) public onlyOwner {
-        // Check for address 0
-        require(percentage > 0, "Error: Invalid percentage");
-        require(
-            percentage + _adminEarning <= 100,
-            "Error: Cumulative share value can not be greater than 100"
-        );
-        _creatorEarning = percentage;
-    }
-
-    /**
      * @dev Function to update the percentage of earnings the admin should receive.
      * @param percentage The percentage of earnings to be allocated to the admin.
      */
     function updateAdminsShare(uint256 percentage) public onlyOwner {
         // Check for address 0
         require(percentage > 0, "Error: Invalid percentage");
-        require(
-            percentage + _creatorEarning <= 100,
-            "Error: Cumulative share value can not be greater than 100"
-        );
         _adminEarning = percentage;
     }
 
@@ -314,20 +280,17 @@ contract UppercentNFTPass is
 
     /**
      *
-     * Function for the owner to release and withdraw funds to the admin and creator
+     * Function for the owner to release and withdraw funds to the admin
      */
     function releaseFunds() public onlyOwner {
-        // Calculate admin and creator shares
+        // Calculate admin shares
         uint256 adminShare = (address(this).balance * _adminEarning) / 100;
-        uint256 creatorShare = (address(this).balance * _creatorEarning) / 100;
 
         // Record earnings
         earnings[_admin] += adminShare;
-        earnings[_creator] += creatorShare;
 
-        // Transfer funds to admin and creator
+        // Transfer funds to admin
         payable(_admin).transfer(adminShare);
-        payable(_creator).transfer(creatorShare);
     }
 
     /**
@@ -431,13 +394,6 @@ contract UppercentNFTPass is
     }
 
     /**
-     * Get creator address
-     */
-    function getCreator() public view virtual returns (address) {
-        return _creator;
-    }
-
-    /**
      *
      * Get admin share
      */
@@ -447,15 +403,7 @@ contract UppercentNFTPass is
 
     /**
      *
-     * Get creator share
-     */
-    function getCreatorShare() public view virtual returns (uint256) {
-        return _creatorEarning;
-    }
-
-    /**
-     *
-     * Get creator & admin earnings
+     * Get admin earnings
      */
     function getEarnings(
         address account

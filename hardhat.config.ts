@@ -1,9 +1,11 @@
-require("@nomicfoundation/hardhat-toolbox");
-require('@openzeppelin/hardhat-upgrades');
+import {HardhatUserConfig, vars} from "hardhat/config";
+import "@nomicfoundation/hardhat-toolbox";
+import "@openzeppelin/hardhat-upgrades";
 
-const { infuraKey, privateKey, etherscanKey } = require('./credentials.json');
+const privateKey = vars.get("WALLET_KEY");
+// const etherscanKey = vars.get("ETHERSCAN_KEY");
 
-module.exports = {
+const config: HardhatUserConfig = {
   networks: {
     coston: {
       url: "https://coston-api.flare.network/ext/bc/C/rpc",
@@ -30,26 +32,26 @@ module.exports = {
       accounts: [privateKey]
     }
   },
-  etherscan: {
-    apiKey: {
-      songbird: [etherscanKey]
-    },
-    customChains: [
-      {
-        network: "songbird",
-        chainId: 19,
-        urls: {
-          apiURL: "https://songbird-explorer.flare.network/api",
-          browserURL: "https://songbird-explorer.flare.network/"
-        }
-      }
-    ]
-  },
-  sourcify: {
-    enabled: true,
-    apiUrl: "https://sourcify.dev/server",
-    browserUrl: "https://repo.sourcify.dev",
-  },
+  // etherscan: {
+  //   apiKey: {
+  //     songbird: [etherscanKey]
+  //   },
+  //   customChains: [
+  //     {
+  //       network: "songbird",
+  //       chainId: 19,
+  //       urls: {
+  //         apiURL: "https://songbird-explorer.flare.network/api",
+  //         browserURL: "https://songbird-explorer.flare.network/"
+  //       }
+  //     }
+  //   ]
+  // },
+  // sourcify: {
+  //   enabled: true,
+  //   apiUrl: "https://sourcify.dev/server",
+  //   browserUrl: "https://repo.sourcify.dev",
+  // },
   solidity: {
     version: "0.8.20",
     settings: {
@@ -61,3 +63,5 @@ module.exports = {
     }
   }
 };
+
+export default config;

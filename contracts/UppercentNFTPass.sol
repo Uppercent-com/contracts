@@ -473,9 +473,9 @@ contract UppercentNFTPass is
     function getTokenPriceWei()
         public
         view
-        returns (uint256 _price, uint64 _timestamp)
+        returns (uint256 _price, int8 _decimals, uint64 _timestamp)
     {
-        (_price, _timestamp) = ftsoV2.getFeedByIdInWei(FEED_ID);
+        (_price, _decimals, _timestamp) = ftsoV2.getFeedById(FEED_ID);
     }
 
     /**
@@ -485,8 +485,16 @@ contract UppercentNFTPass is
         uint256 _amount
     ) public view returns (uint256 _price) {
         uint64 _timestamp;
-        (_price, _timestamp) = getTokenPriceWei();
-        return uint256(_price * _amount);
+        int8 _decimals; // int8 since the getFeedById function uses int8 for decimals
+        (_price, _decimals, _timestamp) = getTokenPriceWei();
+        // Ensure _decimals is positive before casting to uint256
+        require(_decimals >= 0, "Decimals must be non-negative");
+
+        // Convert _decimals to uint256 for safe arithmetic
+        uint256 decimals = uint256(int256(_decimals));
+
+        // Adjusting for the decimal places returned by getFeedById
+        return uint256((_price * _amount) / (10 ** (18 + decimals)));
     }
 
     /**
@@ -495,9 +503,17 @@ contract UppercentNFTPass is
     function dollarToWei(
         uint256 _amount
     ) public view returns (uint256 _price) {
-        uint64 _timestamp;
-        (_price, _timestamp) = getTokenPriceWei();
-        return uint256(_amount / _price);
+        uint256 _timestamp;
+        int8 _decimals; // int8 since the getFeedById function uses int8 for decimals
+        (_price, _decimals, _timestamp) = getTokenPriceWei();
+        // Ensure _decimals is positive before casting to uint256
+        require(_decimals >= 0, "Decimals must be non-negative");
+
+        // Convert _decimals to uint256 for safe arithmetic
+        uint256 decimals = uint256(int256(_decimals));
+
+        // Adjusting for the decimal places returned by getFeedById
+        return uint256((_amount * (10 ** (18 + decimals))) / _price);
     }
 
     /////////////////////////////////////////////////////////

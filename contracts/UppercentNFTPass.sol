@@ -202,7 +202,7 @@ contract UppercentNFTPass is
         );
         require(
             totalSupply(TOKEN_ID) + amount <=
-                maxAavailableSupply(msg.sender, _maxSupply),
+                maxAvailableSupply(msg.sender, _maxSupply),
             "Error: Exceeds maximum supply"
         );
         require(
@@ -225,12 +225,12 @@ contract UppercentNFTPass is
         require(isPresaleActive(), "Error: No active pre-sale");
         require(
             totalSupply(TOKEN_ID) + amount <=
-                maxAavailableSupply(msg.sender, _maxSupply),
+                maxAvailableSupply(msg.sender, _maxSupply),
             "Error: Exceeds maximum supply"
         );
         require(
             _presaleTotalSupply + amount <=
-                maxAavailableSupply(msg.sender, _presaleMaxSupply),
+                maxAvailableSupply(msg.sender, _presaleMaxSupply),
             "Error: Exceeds pre-sale supply"
         );
         require(
@@ -336,7 +336,7 @@ contract UppercentNFTPass is
      * max unlocked supply for regular minting
      * @ account is the sender wallet address
      */
-    function maxAavailableSupply(
+    function maxAvailableSupply(
         address account,
         uint256 supply
     ) internal view returns (uint256) {

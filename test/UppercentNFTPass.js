@@ -64,14 +64,7 @@ describe("UppercentNFTPass", function () {
       UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
       uppercentNFTPass = await upgrades.deployProxy(
         UppercentNFTPass,
-        [
-          owner.address,
-          10,
-          "testURI",
-          100,
-          1000000000000000000n,
-          2,
-        ],
+        [owner.address, 10, "testURI", 100, 1, 2],
         { initializer: "initialize" }
       );
       await expect(
@@ -81,7 +74,7 @@ describe("UppercentNFTPass", function () {
 
     it("Should not allow minting with insufficient amount sent", async function () {
       await expect(
-        uppercentNFTPass.mint(1, { value: 9n })
+        uppercentNFTPass.mint(1, { value: 1999999999999999999n })
       ).to.be.revertedWith("Error: Insufficient amount sent");
     });
 
@@ -165,7 +158,9 @@ describe("UppercentNFTPass", function () {
       await createPresaleTx.wait();
       await time.increase(1000);
 
-      expect(await uppercentNFTPass.getPresaleStartDate()).to.equal(presaleStartDate);
+      expect(await uppercentNFTPass.getPresaleStartDate()).to.equal(
+        presaleStartDate
+      );
       expect(await uppercentNFTPass.getPresaleEndDate()).to.equal(
         presaleEndDate
       );
@@ -188,7 +183,12 @@ describe("UppercentNFTPass", function () {
       const supply = 101; // exceeds the maximum supply
 
       await expect(
-        uppercentNFTPass.createPresale(supply, 1, presaleStartDate, preSaleEndDate)
+        uppercentNFTPass.createPresale(
+          supply,
+          1,
+          presaleStartDate,
+          preSaleEndDate
+        )
       ).to.be.revertedWith("Error: Presale supply exceeds max supply");
     });
   });
@@ -200,7 +200,12 @@ describe("UppercentNFTPass", function () {
       const preSaleEndDate = now + 3600;
 
       // Create a pre-sale
-      await uppercentNFTPass.createPresale(50, 1, presaleStartDate, preSaleEndDate);
+      await uppercentNFTPass.createPresale(
+        50,
+        1,
+        presaleStartDate,
+        preSaleEndDate
+      );
       await time.increase(1000);
       await uppercentNFTPass.presaleMint(1, { value: 1000000000000000000n });
 
@@ -215,7 +220,12 @@ describe("UppercentNFTPass", function () {
       const preSaleEndDate = now + 3600;
 
       // Create a pre-sale
-      await uppercentNFTPass.createPresale(2, 1, presaleStartDate, preSaleEndDate);
+      await uppercentNFTPass.createPresale(
+        2,
+        1,
+        presaleStartDate,
+        preSaleEndDate
+      );
       await time.increase(1000);
 
       await uppercentNFTPass.presaleMint(2, { value: 2000000000000000000n });
@@ -251,7 +261,12 @@ describe("UppercentNFTPass", function () {
       const preSaleEndDate = now + 3600;
 
       // Create a pre-sale
-      await uppercentNFTPass.createPresale(50, 1, preSaleStartDate, preSaleEndDate);
+      await uppercentNFTPass.createPresale(
+        50,
+        1,
+        preSaleStartDate,
+        preSaleEndDate
+      );
       await time.increase(1000);
 
       await expect(
@@ -265,7 +280,12 @@ describe("UppercentNFTPass", function () {
       const preSaleEndDate = now + 3600;
 
       // Create a pre-sale
-      await uppercentNFTPass.createPresale(50, 1, preSaleStartDate, preSaleEndDate);
+      await uppercentNFTPass.createPresale(
+        50,
+        1,
+        preSaleStartDate,
+        preSaleEndDate
+      );
 
       // Wait for pre-sale to end
       await time.increase(7200);
@@ -291,7 +311,12 @@ describe("UppercentNFTPass", function () {
       const now = Math.floor(Date.now() / 1000);
       const preSaleStartDate = now + 100;
       const preSaleEndDate = now + 3600;
-      await uppercentNFTPass.createPresale(2, 1, preSaleStartDate, preSaleEndDate);
+      await uppercentNFTPass.createPresale(
+        2,
+        1,
+        preSaleStartDate,
+        preSaleEndDate
+      );
       await time.increase(1000);
 
       // mint token during pre-sale

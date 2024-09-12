@@ -18,8 +18,8 @@ import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155Supp
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 // to get data feed for Flare/Coston/Coston2/Songbird
-import "@flarenetwork/flare-periphery-contracts/songbird/util-contracts/userInterfaces/IFlareContractRegistry.sol";
-import "@flarenetwork/flare-periphery-contracts/songbird/ftso/userInterfaces/IFtsoRegistry.sol";
+import "@flarenetwork/flare-periphery-contracts/coston2/ContractRegistry.sol";
+import "@flarenetwork/flare-periphery-contracts/coston2/TestFtsoV2Interface.sol";
 
 /**
  *
@@ -35,6 +35,7 @@ contract UppercentNFTPass is
     ERC1155SupplyUpgradeable,
     UUPSUpgradeable
 {
+    TestFtsoV2Interface internal ftsoV2;
     //
     /**
      * Constant for token ID
@@ -43,6 +44,7 @@ contract UppercentNFTPass is
      */
     uint256 public constant TOKEN_ID = 0;
     string private constant TOKEN_SYMBOL = "SGB"; // for FTSO
+    bytes21 private constant FEED_ID = bytes21(0x01464c522f55534400000000000000000000000000); // FLR/USD
 
     // State variables for contract parameters
     uint256 private _maxSupply;
@@ -140,6 +142,7 @@ contract UppercentNFTPass is
         _presaleCreated = false;
         _allowListExists = false;
         _firstPresaleWindow = 7 days;
+        ftsoV2 = ContractRegistry.getTestFtsoV2();
     }
 
     /**
@@ -263,7 +266,7 @@ contract UppercentNFTPass is
         );
         require(price > 0, "Error: Presale price must be greater than zero");
         require(
-            startDate > block.timestamp,
+            startDate >= block.timestamp,
             "Error: Start date can not be set to past date"
         );
         require(startDate < endDate, "Error: Invalid presale dates");
@@ -319,7 +322,7 @@ contract UppercentNFTPass is
             reqAmount = mintPrice * amount;
         }
 
-        return dollarToWei(TOKEN_SYMBOL, reqAmount);
+        return dollarToWei(reqAmount);
     }
 
     /**
@@ -467,52 +470,34 @@ contract UppercentNFTPass is
      *
      * FTSO Integration
      */
-    function getTokenPriceWei(
-        string memory _symbol
-    )
+    function getTokenPriceWei()
         public
         view
-        returns (uint256 _price, uint256 _timestamp, uint256 _decimals)
+        returns (uint256 _price, uint64 _timestamp)
     {
-        // 2. Access the Contract Registry
-        IFlareContractRegistry contractRegistry = IFlareContractRegistry(
-            FLARE_CONTRACT_REGISTRY
-        );
-
-        // 3. Retrieve the FTSO Registry
-        IFtsoRegistry ftsoRegistry = IFtsoRegistry(
-            contractRegistry.getContractAddressByName("FtsoRegistry")
-        );
-
-        // 4. Get latest price
-        (_price, _timestamp, _decimals) = ftsoRegistry
-            .getCurrentPriceWithDecimals(_symbol);
+        (_price, _timestamp) = ftsoV2.getFeedByIdInWei(FEED_ID);
     }
 
     /**
      * Convert wei to dollar
      */
     function weiToDollar(
-        string memory _symbol,
         uint256 _amount
     ) public view returns (uint256 _price) {
-        uint256 _timestamp;
-        uint256 _decimals;
-        (_price, _timestamp, _decimals) = getTokenPriceWei(_symbol);
-        return uint256((_price * _amount) / (10 ** (18 + _decimals)));
+        uint64 _timestamp;
+        (_price, _timestamp) = getTokenPriceWei();
+        return uint256(_price * _amount);
     }
 
     /**
      * Convert dollar to wei
      */
     function dollarToWei(
-        string memory _symbol,
         uint256 _amount
     ) public view returns (uint256 _price) {
-        uint256 _timestamp;
-        uint256 _decimals;
-        (_price, _timestamp, _decimals) = getTokenPriceWei(_symbol);
-        return uint256((_amount * (10 ** (18 + _decimals))) / _price);
+        uint64 _timestamp;
+        (_price, _timestamp) = getTokenPriceWei();
+        return uint256(_amount / _price);
     }
 
     /////////////////////////////////////////////////////////
@@ -545,7 +530,7 @@ contract UppercentNFTPass is
         );
         require(price > 0, "Error: Price must be greater than zero");
         require(
-            startDate > block.timestamp,
+            startDate >= block.timestamp,
             "Error: Start date can not be set to past date"
         );
         require(startDate < endDate, "Error: Invalid dates");
@@ -596,7 +581,7 @@ contract UppercentNFTPass is
         );
         require(amount <= userLimit, "Error: Exceeds per-user limit");
         require(
-            msg.value >= dollarToWei(TOKEN_SYMBOL, _allowListPrice * amount),
+            msg.value >= dollarToWei(_allowListPrice * amount),
             "Error: Insufficient amount sent"
         );
 

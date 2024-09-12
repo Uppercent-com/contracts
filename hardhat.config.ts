@@ -1,16 +1,15 @@
-import {HardhatUserConfig, vars} from "hardhat/config";
+import { HardhatUserConfig, vars } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "@openzeppelin/hardhat-upgrades";
 
 const privateKey = vars.get("WALLET_KEY");
-// const etherscanKey = vars.get("ETHERSCAN_KEY");
 
 const config: HardhatUserConfig = {
   networks: {
     coston: {
       url: "https://coston-api.flare.network/ext/bc/C/rpc",
       accounts: [privateKey],
-      chainId: 16
+      chainId: 16,
     },
     coston2: {
       url: "https://coston2-api.flare.network/ext/bc/C/rpc",
@@ -20,7 +19,7 @@ const config: HardhatUserConfig = {
     songbird: {
       url: "https://songbird-api.flare.network/ext/bc/C/rpc",
       accounts: [privateKey],
-      chainId: 19
+      chainId: 19,
     },
     flare: {
       url: "https://flare-api.flare.network/ext/bc/C/rpc",
@@ -29,39 +28,44 @@ const config: HardhatUserConfig = {
     },
     polygon_mumbai: {
       url: "https://rpc-mumbai.maticvigil.com",
-      accounts: [privateKey]
-    }
+      accounts: [privateKey],
+    },
+    hardhat: {
+      forking: {
+        url: "https://coston2-api.flare.network/ext/bc/C/rpc",
+      },
+    },
   },
-  // etherscan: {
-  //   apiKey: {
-  //     songbird: [etherscanKey]
-  //   },
-  //   customChains: [
-  //     {
-  //       network: "songbird",
-  //       chainId: 19,
-  //       urls: {
-  //         apiURL: "https://songbird-explorer.flare.network/api",
-  //         browserURL: "https://songbird-explorer.flare.network/"
-  //       }
-  //     }
-  //   ]
-  // },
-  // sourcify: {
-  //   enabled: true,
-  //   apiUrl: "https://sourcify.dev/server",
-  //   browserUrl: "https://repo.sourcify.dev",
-  // },
+  etherscan: {
+    apiKey: {
+      songbird: "api-key",
+    },
+    customChains: [
+      {
+        network: "songbird",
+        chainId: 19,
+        urls: {
+          apiURL: "https://songbird-explorer.flare.network/api",
+          browserURL: "https://songbird-explorer.flare.network/",
+        },
+      },
+    ],
+  },
+  sourcify: {
+    enabled: true,
+    apiUrl: "https://sourcify.dev/server",
+    browserUrl: "https://repo.sourcify.dev",
+  },
   solidity: {
     version: "0.8.20",
     settings: {
       evmVersion: "london",
       optimizer: {
         enabled: true,
-        runs: 200
-      }
-    }
-  }
+        runs: 200,
+      },
+    },
+  },
 };
 
 export default config;

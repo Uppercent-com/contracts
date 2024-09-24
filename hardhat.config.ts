@@ -32,7 +32,7 @@ const config: HardhatUserConfig = {
     },
     hardhat: {
       forking: {
-        url: "https://coston2-api.flare.network/ext/bc/C/rpc",
+        url: "https://flare-api.flare.network/ext/C/rpc?x-apikey=4c56de23-853c-478b-83a6-dafb3ab0f44e",
       },
     },
   },

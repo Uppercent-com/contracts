@@ -44,7 +44,7 @@ contract UppercentNFTPass is
      * @notice A new contract per course NFT passes
      * Hence token ID is fixed to '0'
      */
-    uint256 public constant TOKEN_ID = 0;
+    uint256 public constant TOKEN_ID = 1;
     string private constant TOKEN_SYMBOL = "SGB"; // for FTSO
     bytes21 private constant FEED_ID = bytes21(0x01464c522f55534400000000000000000000000000); // FLR/USD
 

@@ -9,9 +9,23 @@ describe("UppercentNFTPass", function () {
   let uppercentNFTPass;
   let owner;
   let buyer;
+  let impersonatedSigner;
+  const impersonatedAddress = "0x3190c12068E470691ecac2B68B26310B378E7199"; // The holder of the old NFT
 
   beforeEach(async function () {
     [owner, buyer] = await ethers.getSigners();
+
+    await hre.network.provider.request({
+      method: "hardhat_impersonateAccount",
+      params: [impersonatedAddress],
+    });
+
+    impersonatedSigner = await ethers.getSigner(impersonatedAddress);
+
+    await owner.sendTransaction({
+      to: impersonatedAddress,
+      value: ethers.parseEther("10.0"), // Send 50 FLR to the impersonated account
+    });
 
     UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
     uppercentNFTPass = await upgrades.deployProxy(
@@ -45,7 +59,7 @@ describe("UppercentNFTPass", function () {
     it("Should mint NFTs and update user's balance", async function () {
       const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
       await uppercentNFTPass.mint(1, { value: requiredAmount });
-      expect(await uppercentNFTPass.balanceOf(owner.address, 0)).to.equal(1);
+      expect(await uppercentNFTPass.balanceOf(owner.address, 1)).to.equal(1);
     });
 
     it("Should not allow minting more than the maximum supply", async function () {
@@ -95,7 +109,7 @@ describe("UppercentNFTPass", function () {
       await uppercentNFTPass.unpause();
       const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
       await uppercentNFTPass.mint(1, { value: requiredAmount });
-      expect(await uppercentNFTPass.balanceOf(owner.address, 0)).to.equal(1);
+      expect(await uppercentNFTPass.balanceOf(owner.address, 1)).to.equal(1);
     });
   });
 
@@ -180,7 +194,7 @@ describe("UppercentNFTPass", function () {
       const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
       await uppercentNFTPass.mint(1, { value: requiredAmount });
 
-      expect(await uppercentNFTPass.balanceOf(owner.address, 0)).to.equal(1);
+      expect(await uppercentNFTPass.balanceOf(owner.address, 1)).to.equal(1);
       expect(await uppercentNFTPass.isPresaleActive()).to.be.true;
       expect(await uppercentNFTPass.getMintPrice()).to.equal(1); // Pre-sale price
     });
@@ -209,6 +223,51 @@ describe("UppercentNFTPass", function () {
       await expect(
         uppercentNFTPass.mint(1, { value: requiredAmount })
       ).to.be.revertedWith("Error: Exceeds available supply for Group 2 during presale");
+    });
+
+    it("Should allow Group 1 (previous buyer) to mint during presale from reserved supply", async function () {
+      const now = await time.latest();
+      const presaleStartDate = now + 100;
+      const presaleEndDate = now + 3600;
+
+      await uppercentNFTPass.createPresale(1, presaleStartDate, presaleEndDate);
+      await time.increase(1000);
+
+      // Impersonate and mint as the old NFT holder (Group 1)
+      const requiredAmount = await uppercentNFTPass.connect(impersonatedSigner).requiredMintAmount(1);
+      await uppercentNFTPass.connect(impersonatedSigner).mint(1, { value: requiredAmount });
+
+      // Verify the minting happened successfully
+      expect(await uppercentNFTPass.balanceOf(impersonatedSigner.address, 1)).to.equal(1);
+    });
+
+    it("Should allow Group 1 to mint even after Group 2 supply is exhaused", async function () {
+      const now = await time.latest();
+      const presaleStartDate = now + 100;
+      const presaleEndDate = now + 3600;
+
+      uppercentNFTPass = await upgrades.deployProxy(
+        UppercentNFTPass,
+        [owner.address, 10, "testURI", 10, 1, 10, 2],
+        { initializer: "initialize" }
+      );
+
+      // Create a pre-sale
+      await uppercentNFTPass.createPresale(
+        1,
+        presaleStartDate,
+        presaleEndDate
+      );
+      await time.increase(1000);
+      let requiredAmount = await uppercentNFTPass.requiredMintAmount(8);
+      await uppercentNFTPass.mint(8, { value: requiredAmount });
+
+      // Impersonate and mint as the old NFT holder (Group 1)
+      requiredAmount = await uppercentNFTPass.connect(impersonatedSigner).requiredMintAmount(1);
+      await uppercentNFTPass.connect(impersonatedSigner).mint(1, { value: requiredAmount });
+
+      // Verify the minting happened successfully
+      expect(await uppercentNFTPass.balanceOf(impersonatedSigner.address, 1)).to.equal(1);
     });
 
     it("Should not allow minting at pre-sale price post pre-sale window is closed", async function () {
@@ -271,7 +330,7 @@ describe("UppercentNFTPass", function () {
       // mint unsold pre-sale token at standard minting price
       await uppercentNFTPass.mint(1, { value: requiredAmount });
 
-      expect(await uppercentNFTPass.balanceOf(owner.address, 0)).to.equal(3);
+      expect(await uppercentNFTPass.balanceOf(owner.address, 1)).to.equal(3);
     });
   });
 

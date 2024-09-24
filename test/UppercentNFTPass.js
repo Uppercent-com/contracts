@@ -24,7 +24,7 @@ describe("UppercentNFTPass", function () {
 
     await owner.sendTransaction({
       to: impersonatedAddress,
-      value: ethers.parseEther("10.0"), // Send 50 FLR to the impersonated account
+      value: ethers.parseEther("10.0"), // Send 10 FLR to the impersonated account
     });
 
     UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
@@ -358,6 +358,72 @@ describe("UppercentNFTPass", function () {
       expect(await uppercentNFTPass.getEarnings(owner.address)).to.equal(
         totalAmount
       );
+    });
+  });
+
+  describe("Mint and Burn Remaining Supply: ", function () {
+    it("Should allow the owner to mint and burn remaining supply", async function () {
+        // Deploy contract with a max supply of 100 and mint 50 initially
+        UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
+        uppercentNFTPass = await upgrades.deployProxy(
+            UppercentNFTPass,
+            [owner.address, 10, "testURI", 10, 1, 5, 2],
+            { initializer: "initialize" }
+        );
+        const mintAmount = 5;
+        let requiredAmount = await uppercentNFTPass.requiredMintAmount(mintAmount);
+        await uppercentNFTPass.connect(buyer).mint(mintAmount, { value: requiredAmount });
+        
+        expect(await uppercentNFTPass.balanceOf(buyer.address, 1)).to.equal(5);
+
+        let remainingSupply = await uppercentNFTPass.getRemainingSupply();
+        expect(remainingSupply).to.equal(5);
+
+        await uppercentNFTPass.mintAndBurnRemainingSupply();
+
+        expect(await uppercentNFTPass.balanceOf(owner.address, 1)).to.equal(0);
+
+        remainingSupply = await uppercentNFTPass.getRemainingSupply();
+        expect(remainingSupply).to.equal(0);
+
+        // Check that we can't mint now
+        requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
+        await expect(
+            uppercentNFTPass.mint(1, { value: requiredAmount })
+        ).to.be.revertedWith("Error: Exceeds maximum supply");
+    });
+
+    it("Should revert if called by a non-owner", async function () {
+        // Deploy contract
+        UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
+        uppercentNFTPass = await upgrades.deployProxy(
+            UppercentNFTPass,
+            [owner.address, 10, "testURI", 10, 1, 5, 2],
+            { initializer: "initialize" }
+        );
+
+        // Try to call the mintAndBurnRemainingSupply from a non-owner account
+        await expect(
+            uppercentNFTPass.connect(buyer).mintAndBurnRemainingSupply()
+        ).to.be.revertedWith("Ownable: caller is not the owner");
+    });
+
+    it("Should revert if there is no remaining supply", async function () {
+        // Deploy contract with max supply 100 and mint the full supply
+        UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
+        uppercentNFTPass = await upgrades.deployProxy(
+            UppercentNFTPass,
+            [owner.address, 10, "testURI", 10, 1, 10, 2],
+            { initializer: "initialize" }
+        );
+        const mintAmount = 10;
+        const requiredAmount = await uppercentNFTPass.requiredMintAmount(mintAmount);
+        await uppercentNFTPass.mint(mintAmount, { value: requiredAmount });
+
+        // Try to call mintAndBurnRemainingSupply when no supply is left
+        await expect(uppercentNFTPass.mintAndBurnRemainingSupply()).to.be.revertedWith(
+            "Error: No remaining supply to mint and burn"
+        );
     });
   });
 });

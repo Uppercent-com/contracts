@@ -50,6 +50,7 @@ contract UppercentNFTPass is
 
     // State variables for contract parameters
     uint256 private _maxSupply;
+    uint256 private _remainingSupply;
     address private _admin;
     uint256 private _adminEarning;
     uint256 private _mintPrice;
@@ -109,6 +110,7 @@ contract UppercentNFTPass is
 
         // Set contract parameters
         _maxSupply = maxSupply;
+        _remainingSupply = maxSupply;
         _mintPrice = mintPrice; // $USD
         _admin = owner;
         _adminEarning = adminEarning;
@@ -172,8 +174,7 @@ contract UppercentNFTPass is
     function mint(uint256 amount) public payable {
         // Check various conditions before allowing minting
         require(
-            totalSupply(TOKEN_ID) + amount <=
-                _maxSupply,
+            _remainingSupply >= amount,
             "Error: Exceeds maximum supply"
         );
         require(
@@ -195,6 +196,28 @@ contract UppercentNFTPass is
         
         // Mint NFTs, transfer earnings, and update user's pass count
         _mint(msg.sender, TOKEN_ID, amount, "");
+        _remainingSupply -= amount;
+    }
+
+    /**
+     * @dev Function that allows the owner to mint the remaining supply of NFTs 
+     * and immediately burn them. Can only be called by the owner.
+     */
+    function mintAndBurnRemainingSupply() external onlyOwner {
+        uint256 remainingSupply = _maxSupply - totalSupply(TOKEN_ID);
+        require(remainingSupply > 0, "Error: No remaining supply to mint and burn");
+
+        // Mint remaining supply to the owner's address
+        _mint(msg.sender, TOKEN_ID, remainingSupply, "");
+
+        // Burn the minted tokens immediately
+        _burn(msg.sender, TOKEN_ID, remainingSupply);
+
+        _remainingSupply = 0;
+    }
+
+    function getRemainingSupply() public view returns (uint256) {
+        return _remainingSupply;
     }
 
     /**

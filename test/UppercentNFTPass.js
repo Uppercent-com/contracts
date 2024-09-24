@@ -16,7 +16,7 @@ describe("UppercentNFTPass", function () {
     UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
     uppercentNFTPass = await upgrades.deployProxy(
       UppercentNFTPass,
-      [owner.address, 10, "testURI", 100, 2, 10],
+      [owner.address, 10, "testURI", 100, 2, 10, 20],
       { initializer: "initialize" }
     );
     //await uppercentNFTPass.deployed();
@@ -43,7 +43,7 @@ describe("UppercentNFTPass", function () {
 
   describe("Standard Minting: ", function () {
     it("Should mint NFTs and update user's balance", async function () {
-      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
+      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
       await uppercentNFTPass.mint(1, { value: requiredAmount });
       expect(await uppercentNFTPass.balanceOf(owner.address, 0)).to.equal(1);
     });
@@ -52,10 +52,10 @@ describe("UppercentNFTPass", function () {
       UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
       uppercentNFTPass = await upgrades.deployProxy(
         UppercentNFTPass,
-        [owner.address, 10, "testURI", 1, 1, 10],
+        [owner.address, 10, "testURI", 1, 1, 10, 0],
         { initializer: "initialize" }
       );
-      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
+      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
       await uppercentNFTPass.mint(1, { value: requiredAmount });
       await expect(
         uppercentNFTPass.mint(1, { value: requiredAmount })
@@ -66,17 +66,17 @@ describe("UppercentNFTPass", function () {
       UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
       uppercentNFTPass = await upgrades.deployProxy(
         UppercentNFTPass,
-        [owner.address, 10, "testURI", 100, 1, 2],
+        [owner.address, 10, "testURI", 100, 1, 2, 20],
         { initializer: "initialize" }
       );
-      const requiredAmount = await uppercentNFTPass.requiredMintAmount(3, owner.address);
+      const requiredAmount = await uppercentNFTPass.requiredMintAmount(3);
       await expect(
         uppercentNFTPass.mint(3, { value: requiredAmount })
       ).to.be.revertedWith("Error: Exceeds per-user limit");
     });
 
     it("Should not allow minting with insufficient amount sent", async function () {
-      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
+      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
       await expect(
         uppercentNFTPass.mint(1, { value: requiredAmount - 1n })
       ).to.be.revertedWith("Error: Insufficient amount sent");
@@ -84,15 +84,16 @@ describe("UppercentNFTPass", function () {
 
     it("Should pause minting", async function () {
       await uppercentNFTPass.pause();
-      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
+      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
       await expect(
         uppercentNFTPass.connect(buyer).mint(1, { value: requiredAmount })
       ).to.be.revertedWithCustomError(uppercentNFTPass, "EnforcedPause");
     });
+
     it("Should unpause minting", async function () {
       await uppercentNFTPass.pause();
       await uppercentNFTPass.unpause();
-      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
+      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
       await uppercentNFTPass.mint(1, { value: requiredAmount });
       expect(await uppercentNFTPass.balanceOf(owner.address, 0)).to.equal(1);
     });
@@ -105,7 +106,6 @@ describe("UppercentNFTPass", function () {
       const presaleEndDate = now + 3600;
 
       const createPresaleTx = await uppercentNFTPass.createPresale(
-        50,
         1,
         presaleStartDate,
         presaleEndDate
@@ -116,30 +116,12 @@ describe("UppercentNFTPass", function () {
       expect(await uppercentNFTPass.isPresaleActive()).to.equal(true);
     });
 
-    it("Should set right presale supply", async function () {
-      const now = await time.latest();
-      const presaleStartDate = now + 100;
-      const presaleEndDate = now + 3600;
-
-      const createPresaleTx = await uppercentNFTPass.createPresale(
-        50,
-        1,
-        presaleStartDate,
-        presaleEndDate
-      );
-      await createPresaleTx.wait();
-      await time.increase(1000);
-
-      expect(await uppercentNFTPass.getPresaleMaxSupply()).to.equal(50);
-    });
-
     it("Should set right presale price", async function () {
       const now = await time.latest();
       const presaleStartDate = now + 100;
       const presaleEndDate = now + 3600;
 
       const createPresaleTx = await uppercentNFTPass.createPresale(
-        50,
         1,
         presaleStartDate,
         presaleEndDate
@@ -156,7 +138,6 @@ describe("UppercentNFTPass", function () {
       const presaleEndDate = now + 3600;
 
       const createPresaleTx = await uppercentNFTPass.createPresale(
-        50,
         1,
         presaleStartDate,
         presaleEndDate
@@ -178,24 +159,8 @@ describe("UppercentNFTPass", function () {
       const presaleEndDate = now - 3600; // Invalid date (end before start)
 
       await expect(
-        uppercentNFTPass.createPresale(50, 1, presaleStartDate, presaleEndDate)
+        uppercentNFTPass.createPresale(1, presaleStartDate, presaleEndDate)
       ).to.be.revertedWith("Error: Invalid presale dates");
-    });
-
-    it("Should not allow creating a presale with supply exceeding maximum supply", async function () {
-      const now = await time.latest();
-      const presaleStartDate = now + 100;
-      const preSaleEndDate = now + 3600;
-      const supply = 101; // exceeds the maximum supply
-
-      await expect(
-        uppercentNFTPass.createPresale(
-          supply,
-          1,
-          presaleStartDate,
-          preSaleEndDate
-        )
-      ).to.be.revertedWith("Error: Presale supply exceeds max supply");
     });
   });
 
@@ -207,81 +172,43 @@ describe("UppercentNFTPass", function () {
 
       // Create a pre-sale
       await uppercentNFTPass.createPresale(
-        50,
         1,
         presaleStartDate,
         preSaleEndDate
       );
       await time.increase(1000);
-      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
-      await uppercentNFTPass.presaleMint(1, { value: requiredAmount });
+      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
+      await uppercentNFTPass.mint(1, { value: requiredAmount });
 
       expect(await uppercentNFTPass.balanceOf(owner.address, 0)).to.equal(1);
       expect(await uppercentNFTPass.isPresaleActive()).to.be.true;
       expect(await uppercentNFTPass.getMintPrice()).to.equal(1); // Pre-sale price
     });
 
-    it("Should not allow minting more than the pre-sale max supply", async function () {
+    it("Should not allow minting more than the unreserved amount during pre-sale", async function () {
       const now = await time.latest();
       const presaleStartDate = now + 100;
       const preSaleEndDate = now + 3600;
 
+      uppercentNFTPass = await upgrades.deployProxy(
+        UppercentNFTPass,
+        [owner.address, 10, "testURI", 100, 1, 100, 20],
+        { initializer: "initialize" }
+      );
+
       // Create a pre-sale
       await uppercentNFTPass.createPresale(
-        2,
         1,
         presaleStartDate,
         preSaleEndDate
       );
       await time.increase(1000);
-      let requiredAmount = await uppercentNFTPass.requiredMintAmount(2, owner.address);
-      await uppercentNFTPass.presaleMint(2, { value: requiredAmount });
-      requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
-      await expect(
-        uppercentNFTPass.presaleMint(1, { value: requiredAmount })
-      ).to.be.revertedWith("Error: Exceeds pre-sale supply");
-    });
-
-    it("Should not start pre-sale before the pre-sale start date", async function () {
-      const now = await time.latest();
-      const preSaleStartDate = now + 3600;
-      const preSaleEndDate = preSaleStartDate + 3600;
-
-      // Create a pre-sale
-      await uppercentNFTPass.createPresale(
-        50,
-        1,
-        preSaleStartDate,
-        preSaleEndDate
-      );
-
-      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
-      await expect(
-        uppercentNFTPass.presaleMint(1, { value: requiredAmount })
-      ).to.be.revertedWith(
-        "Error: First pre-sale window is for allowed list or no active pre-sale"
-      );
-    });
-
-    it("Should not allow standard minting during pre-sale window is active", async function () {
-      this.timeout(120000);
-      const now = await time.latest();
-      const preSaleStartDate = now + 100;
-      const preSaleEndDate = now + 3600;
-
-      // Create a pre-sale
-      await uppercentNFTPass.createPresale(
-        50,
-        1,
-        preSaleStartDate,
-        preSaleEndDate
-      );
-      await time.increase(1000);
-
-      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
+      let requiredAmount = await uppercentNFTPass.requiredMintAmount(80);
+      await uppercentNFTPass.mint(80, { value: requiredAmount });
+      requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
       await expect(
         uppercentNFTPass.mint(1, { value: requiredAmount })
-      ).to.be.revertedWith("Error: Pre-sale in Progress");
+      ).to.be.revertedWith("Error: Exceeds available supply for Group 2 during presale");
     });
 
     it("Should not allow minting at pre-sale price post pre-sale window is closed", async function () {
@@ -292,20 +219,20 @@ describe("UppercentNFTPass", function () {
 
       // Create a pre-sale
       await uppercentNFTPass.createPresale(
-        50,
         1,
         preSaleStartDate,
         preSaleEndDate
       );
+      await time.increase(1000);
+      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
 
       // Wait for pre-sale to end
       await time.increase(7200);
 
-      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
       await expect(
-        uppercentNFTPass.presaleMint(1, { value: requiredAmount })
+        uppercentNFTPass.mint(1, { value: requiredAmount })
       ).to.be.revertedWith(
-        "Error: First pre-sale window is for allowed list or no active pre-sale"
+        "Error: Insufficient amount sent"
       );
     });
 
@@ -314,12 +241,12 @@ describe("UppercentNFTPass", function () {
       UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
       uppercentNFTPass = await upgrades.deployProxy(
         UppercentNFTPass,
-        [owner.address, 10, "testURI", 3, 2, 3],
+        [owner.address, 10, "testURI", 3, 2, 3, 0],
         { initializer: "initialize" }
       );
 
       // mint 1 token first
-      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
+      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
       await uppercentNFTPass.mint(1, { value: requiredAmount });
 
       // create pre-sale with supply 2
@@ -327,7 +254,6 @@ describe("UppercentNFTPass", function () {
       const preSaleStartDate = now + 100;
       const preSaleEndDate = now + 3600;
       await uppercentNFTPass.createPresale(
-        2,
         1,
         preSaleStartDate,
         preSaleEndDate
@@ -335,7 +261,7 @@ describe("UppercentNFTPass", function () {
       await time.increase(1000);
 
       // mint token during pre-sale
-      await uppercentNFTPass.presaleMint(1, { value: requiredAmount });
+      await uppercentNFTPass.mint(1, { value: requiredAmount });
 
       // close pre-sale before the end date
       await uppercentNFTPass.closePresale();
@@ -352,7 +278,7 @@ describe("UppercentNFTPass", function () {
   describe("Admin Earning:", function () {
     it("Should release funds to admin", async function () {
       this.timeout(120000);
-      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
+      const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
       await uppercentNFTPass.mint(1, { value: requiredAmount });
       const adminBalanceBefore = await ethers.provider.getBalance(
         owner.address
@@ -363,382 +289,16 @@ describe("UppercentNFTPass", function () {
     });
     it("Should return total earning for admin", async function () {
       this.timeout(120000);
-      let requiredAmount = await uppercentNFTPass.requiredMintAmount(1, owner.address);
+      let requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
       let totalAmount = requiredAmount;
       await uppercentNFTPass.mint(1, { value: requiredAmount });
-      requiredAmount = await uppercentNFTPass.requiredMintAmount(2, owner.address);
+      requiredAmount = await uppercentNFTPass.requiredMintAmount(2);
       totalAmount += requiredAmount;
       await uppercentNFTPass.mint(2, { value: requiredAmount });
       await uppercentNFTPass.releaseFunds();
       expect(await uppercentNFTPass.getEarnings(owner.address)).to.equal(
         totalAmount
       );
-    });
-  });
-
-  describe("Setting up Allow List: ", function () {
-    it("Should set up allow list and check if allow list is active", async function () {
-      this.timeout(120000);
-      const now = await time.latest();
-      const allowlistStartDate = now + 100;
-      const allowlistEndDate = now + 3600;
-
-      const tx = await uppercentNFTPass.setAllowList(
-        50,
-        1,
-        allowlistStartDate,
-        allowlistEndDate
-      );
-      await tx.wait();
-      await time.increase(1000);
-
-      expect(await uppercentNFTPass.isAllowListActive()).to.equal(true);
-    });
-
-    it("Should set right limit for allow list", async function () {
-      this.timeout(120000);
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-
-      const tx = await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await tx.wait();
-      await time.increase(1000);
-
-      expect(await uppercentNFTPass.getAllowListMaxLimit()).to.equal(50);
-    });
-
-    it("Should set right allow list price", async function () {
-      this.timeout(120000);
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-
-      const tx = await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await tx.wait();
-      await time.increase(1000);
-
-      expect(await uppercentNFTPass.getAllowListPrice()).to.equal(1);
-    });
-
-    it("Should set right allow list start and end dates", async function () {
-      this.timeout(120000);
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-
-      const tx = await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await tx.wait();
-      await time.increase(1000);
-
-      expect(await uppercentNFTPass.getAllowListStartDate()).to.equal(startDate);
-      expect(await uppercentNFTPass.getAllowListEndDate()).to.equal(endDate);
-    });
-
-    it("Should not allow setting up a allow list with invalid dates", async function () {
-      this.timeout(120000);
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now - 3600; // Invalid date (end before start)
-
-      await expect(
-        uppercentNFTPass.setAllowList(50, 1, startDate, endDate)
-      ).to.be.revertedWith("Error: Invalid dates");
-    });
-
-    it("Should not allow creating an allow list with limit exceeding maximum supply", async function () {
-      this.timeout(120000);
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      const supply = 101; // exceeds the maximum supply
-
-      await expect(
-        uppercentNFTPass.setAllowList(supply, 1, startDate, endDate)
-      ).to.be.revertedWith("Error: Allow list supply exceeds max supply");
-    });
-
-    it("Should not allow creating an allow list if pre-sale is active", async function () {
-      this.timeout(120000);
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      // creating pre-sale
-      const createPresaleTx = await uppercentNFTPass.createPresale(
-        50,
-        1,
-        startDate,
-        endDate
-      );
-      await createPresaleTx.wait();
-      await time.increase(1000);
-      // setting up allow list
-      await expect(
-        uppercentNFTPass.setAllowList(50, 1, startDate, endDate)
-      ).to.be.revertedWith("Error: No Allow list when pre-sale is active");
-    });
-
-    it("Should not allow creating an allow list again", async function () {
-      this.timeout(120000);
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      // setting up allow list
-      const tx1 = await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await tx1.wait();
-      await time.increase(1000);
-      // setting up allow list again
-      await expect(
-        uppercentNFTPass.setAllowList(50, 1, startDate, endDate)
-      ).to.be.revertedWith("Error: Allow list exists");
-    });
-  });
-
-  describe("Subscribing Allow List: ", function () {
-    it("Should not allow subscription with no active allow list", async function () {
-      await expect(
-        uppercentNFTPass.subscribeAllowList(1, { value: 1000000000000000000n })
-      ).to.be.revertedWith("Error: No allow list exists");
-    });
-
-    it("Should allow subscription for at least 1 NFT pass", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      // setting up allow list
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await uppercentNFTPass.subscribeAllowList(1, {
-        value: 1000000000000000000n,
-      });
-      expect(
-        await uppercentNFTPass.getUserReservedPasses(owner.address)
-      ).to.equal(1);
-    });
-
-    it("Should not allow subscription for more than the allow-list limit", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      // setting up allow list
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await uppercentNFTPass.subscribeAllowList(1, {
-        value: 1000000000000000000n,
-      });
-      await expect(
-        uppercentNFTPass.subscribeAllowList(50, { value: 1000000000000000000n })
-      ).to.be.revertedWith("Error: Exceeds maximum allowed list limit");
-    });
-
-    it("Should not allow subscription for more than the user limit", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      // setting up allow list
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await uppercentNFTPass.subscribeAllowList(9, {
-        value: 9000000000000000000n,
-      });
-      await expect(
-        uppercentNFTPass.subscribeAllowList(2, { value: 2000000000000000000n })
-      ).to.be.revertedWith("Error: Exceeds per-user limit");
-    });
-
-    it("Should not allow subscription for insufficient amount", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      // setting up allow list
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await expect(
-        uppercentNFTPass.subscribeAllowList(2, { value: 1000000000000000000n })
-      ).to.be.revertedWith("Error: Insufficient amount sent");
-    });
-
-    it("Should not allow subscription when the pre-sale is live", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      // setting up allow list
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await uppercentNFTPass.createPresale(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await expect(
-        uppercentNFTPass.subscribeAllowList(1, { value: 1000000000000000000n })
-      ).to.be.revertedWith("Error: Cannot subscribe when pre-sale is live");
-    });
-
-    it("Should return user the correct number of reserved NFT paases in an allow-list", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await uppercentNFTPass.subscribeAllowList(5, {
-        value: 5000000000000000000n,
-      });
-      expect(
-        await uppercentNFTPass.getUserReservedPasses(owner.address)
-      ).to.equal(5);
-    });
-
-    it("Should return the correct total deposit in an allow-list", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await uppercentNFTPass.subscribeAllowList(5, {
-        value: 5000000000000000000n,
-      });
-      await uppercentNFTPass.subscribeAllowList(4, {
-        value: 4000000000000000000n,
-      });
-      expect(await uppercentNFTPass.getAllowListDeposit()).to.equal(
-        9000000000000000000n
-      );
-    });
-
-    it("Should allow minting at discounted rate during a pre-sale at pre-sale price", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await uppercentNFTPass.subscribeAllowList(5, {
-        value: 5000000000000000000n,
-      });
-      await uppercentNFTPass.createPresale(50, 2, startDate, endDate); // pre-sale rate: $2
-      await uppercentNFTPass.presaleMint(5, { value: 5000000000000000000n }); // required amount to mint 5 NFTs: 5000000000000000000n
-      expect(await uppercentNFTPass.balanceOf(owner.address, 0)).to.equal(5);
-    });
-
-    it("Should not permit non-allow-list users to mint during first presale window", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await uppercentNFTPass.createPresale(50, 2, startDate, endDate); // pre-sale rate: $2
-      await time.increase(1000);
-      await expect(
-        uppercentNFTPass
-          .connect(buyer)
-          .presaleMint(5, { value: 5000000000000000000n })
-      ).to.be.revertedWith(
-        "Error: First pre-sale window is for allowed list or no active pre-sale"
-      );
-    });
-
-    it("Should permit non-allow-list users to mint after first presale window is over", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await uppercentNFTPass.createPresale(50, 2, startDate, endDate); // pre-sale rate: $2
-      await time.increase(1000);
-      await uppercentNFTPass.setFirstPresaleWindow(5); // setting pre-sale first window for 5 seconds
-      // Wait for first pre-sale window to end
-      await new Promise((resolve) => setTimeout(resolve, 5100));
-      await uppercentNFTPass
-        .connect(buyer)
-        .presaleMint(5, { value: 10000000000000000000n });
-      expect(await uppercentNFTPass.balanceOf(buyer, 0)).to.equal(5);
-    });
-
-    it("Should not permit non-allow-list users to mint at discounted price", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await uppercentNFTPass.subscribeAllowList(5, {
-        value: 5000000000000000000n,
-      }); // owner address reserved 5 NFTs
-      await uppercentNFTPass.createPresale(50, 2, startDate, endDate); // pre-sale rate: $2
-      await time.increase(1000);
-      await uppercentNFTPass.setFirstPresaleWindow(5); // setting pre-sale first window for 5 seconds
-      // Wait for first pre-sale window to end
-      await new Promise((resolve) => setTimeout(resolve, 5100));
-      await expect(
-        uppercentNFTPass
-          .connect(buyer)
-          .presaleMint(5, { value: 5000000000000000000n })
-      ).to.be.revertedWith("Error: Insufficient amount sent"); // required amount to mint 5 NFTs: 10000000000000000000n for non-allow-list users
-    });
-
-    it("Should not permit non-allow-list users to mint reserved NFTs", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await uppercentNFTPass.subscribeAllowList(5, {
-        value: 5000000000000000000n,
-      }); // owner address reserved 5 NFTs
-      await uppercentNFTPass.createPresale(50, 2, startDate, endDate); // pre-sale rate: 2000000000000000000n
-      await time.increase(1000);
-      await expect(
-        uppercentNFTPass
-          .connect(buyer)
-          .presaleMint(46, { value: 92000000000000000000n })
-      ).to.be.revertedWith(
-        "Error: First pre-sale window is for allowed list or no active pre-sale"
-      );
-    });
-
-    it("Should ensure the required amount, to mint NFTs more than the reserved, is correct", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await uppercentNFTPass.subscribeAllowList(5, {
-        value: 5000000000000000000n,
-      }); // owner address reserved 5 NFTs
-      await uppercentNFTPass.createPresale(50, 2, startDate, endDate); // pre-sale rate: 2000000000000000000n
-      await time.increase(1000);
-      expect(
-        await uppercentNFTPass.requiredMintAmount(10, owner.address)
-      ).to.equal(15000000000000000000n);
-    });
-
-    it("Should enable discounted minting during regular sale when pre-sale is inactive.", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await uppercentNFTPass.subscribeAllowList(5, {
-        value: 5000000000000000000n,
-      });
-      await uppercentNFTPass.mint(5, { value: 5000000000000000000n });
-      expect(await uppercentNFTPass.balanceOf(owner.address, 0)).to.equal(5);
-    });
-
-    it("Should reset reserved supply after the first pre-sale window is over", async function () {
-      const now = await time.latest();
-      const startDate = now + 100;
-      const endDate = now + 3600;
-      await uppercentNFTPass.setAllowList(50, 1, startDate, endDate);
-      await time.increase(1000);
-      await uppercentNFTPass.subscribeAllowList(5, {
-        value: 5000000000000000000n,
-      }); // owner address reserved 5 NFTs
-      const uReserved = await uppercentNFTPass.getUserReservedPasses(
-        owner.address
-      );
-      await uppercentNFTPass.createPresale(50, 2, startDate, endDate); // pre-sale rate: $2
-      await time.increase(1000);
-      await uppercentNFTPass.setFirstPresaleWindow(5); // setting pre-sale first window for 5 seconds
-      // Wait for first pre-sale window to end
-      await new Promise((resolve) => setTimeout(resolve, 5100));
-      const uResPostWindow = await uppercentNFTPass.getUserReservedPasses(
-        owner.address
-      );
-      expect(uReserved).to.be.gt(uResPostWindow);
     });
   });
 });

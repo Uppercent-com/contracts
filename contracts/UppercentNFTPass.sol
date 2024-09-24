@@ -19,8 +19,11 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 // to get data feed for Flare/Coston/Coston2/Songbird
-import "@flarenetwork/flare-periphery-contracts/coston2/ContractRegistry.sol";
-import "@flarenetwork/flare-periphery-contracts/coston2/TestFtsoV2Interface.sol";
+// for testing
+// import "@flarenetwork/flare-periphery-contracts/coston2/ContractRegistry.sol";
+// import "@flarenetwork/flare-periphery-contracts/coston2/TestFtsoV2Interface.sol";
+import "@flarenetwork/flare-periphery-contracts/flare/ContractRegistry.sol";
+import "@flarenetwork/flare-periphery-contracts/flare/FtsoV2Interface.sol";
 
 /**
  *

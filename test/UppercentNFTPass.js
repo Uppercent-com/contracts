@@ -30,7 +30,7 @@ describe("UppercentNFTPass", function () {
     UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
     uppercentNFTPass = await upgrades.deployProxy(
       UppercentNFTPass,
-      [owner.address, 10, "testURI", 100, 2, 10, 20],
+      [owner.address, 100, "testURI", 100, 2, 10, 20],
       { initializer: "initialize" }
     );
     //await uppercentNFTPass.deployed();
@@ -41,7 +41,7 @@ describe("UppercentNFTPass", function () {
       expect(await uppercentNFTPass.owner()).to.equal(owner.address);
     });
     it("Should set the right admin share", async function () {
-      expect(await uppercentNFTPass.getAdminShare()).to.equal(10);
+      expect(await uppercentNFTPass.getAdminShare()).to.equal(100);
     });
     it("Should set the right URI", async function () {
       expect(await uppercentNFTPass.uri(0)).to.equal("testURI");
@@ -66,7 +66,7 @@ describe("UppercentNFTPass", function () {
       UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
       uppercentNFTPass = await upgrades.deployProxy(
         UppercentNFTPass,
-        [owner.address, 10, "testURI", 1, 1, 10, 0],
+        [owner.address, 100, "testURI", 1, 1, 10, 0],
         { initializer: "initialize" }
       );
       const requiredAmount = await uppercentNFTPass.requiredMintAmount(1);
@@ -80,7 +80,7 @@ describe("UppercentNFTPass", function () {
       UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
       uppercentNFTPass = await upgrades.deployProxy(
         UppercentNFTPass,
-        [owner.address, 10, "testURI", 100, 1, 2, 20],
+        [owner.address, 100, "testURI", 100, 1, 2, 20],
         { initializer: "initialize" }
       );
       const requiredAmount = await uppercentNFTPass.requiredMintAmount(3);
@@ -206,7 +206,7 @@ describe("UppercentNFTPass", function () {
 
       uppercentNFTPass = await upgrades.deployProxy(
         UppercentNFTPass,
-        [owner.address, 10, "testURI", 100, 1, 100, 20],
+        [owner.address, 100, "testURI", 100, 1, 100, 20],
         { initializer: "initialize" }
       );
 
@@ -248,7 +248,7 @@ describe("UppercentNFTPass", function () {
 
       uppercentNFTPass = await upgrades.deployProxy(
         UppercentNFTPass,
-        [owner.address, 10, "testURI", 10, 1, 10, 2],
+        [owner.address, 100, "testURI", 10, 1, 10, 2],
         { initializer: "initialize" }
       );
 
@@ -300,7 +300,7 @@ describe("UppercentNFTPass", function () {
       UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
       uppercentNFTPass = await upgrades.deployProxy(
         UppercentNFTPass,
-        [owner.address, 10, "testURI", 3, 2, 3, 0],
+        [owner.address, 100, "testURI", 3, 2, 3, 0],
         { initializer: "initialize" }
       );
 
@@ -367,7 +367,7 @@ describe("UppercentNFTPass", function () {
         UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
         uppercentNFTPass = await upgrades.deployProxy(
             UppercentNFTPass,
-            [owner.address, 10, "testURI", 10, 1, 5, 2],
+            [owner.address, 100, "testURI", 10, 1, 5, 2],
             { initializer: "initialize" }
         );
         const mintAmount = 5;
@@ -398,7 +398,7 @@ describe("UppercentNFTPass", function () {
         UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
         uppercentNFTPass = await upgrades.deployProxy(
             UppercentNFTPass,
-            [owner.address, 10, "testURI", 10, 1, 5, 2],
+            [owner.address, 100, "testURI", 10, 1, 5, 2],
             { initializer: "initialize" }
         );
 
@@ -413,7 +413,7 @@ describe("UppercentNFTPass", function () {
         UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
         uppercentNFTPass = await upgrades.deployProxy(
             UppercentNFTPass,
-            [owner.address, 10, "testURI", 10, 1, 10, 2],
+            [owner.address, 100, "testURI", 10, 1, 10, 2],
             { initializer: "initialize" }
         );
         const mintAmount = 10;

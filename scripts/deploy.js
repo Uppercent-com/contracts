@@ -6,7 +6,7 @@ async function main() {
   const UppercentNFTPass = await ethers.getContractFactory("UppercentNFTPass");
   const uppercentNFTPass = await upgrades.deployProxy(UppercentNFTPass, [
     "0x9c760302031d1122b214c5869E526bFD57f04cF1", // owner
-    10, // admin earning
+    100, // admin earning
     "testURI", // URI
     500, // maxSupply
     2, // mintPrice

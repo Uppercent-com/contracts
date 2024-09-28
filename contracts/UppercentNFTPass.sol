@@ -17,9 +17,13 @@ import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155Burn
 import "@openzeppelin/contracts-upgradeable/token/ERC1155/extensions/ERC1155SupplyUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/token/ERC1155/IERC1155.sol";
 // to get data feed for Flare/Coston/Coston2/Songbird
-import "@flarenetwork/flare-periphery-contracts/songbird/util-contracts/userInterfaces/IFlareContractRegistry.sol";
-import "@flarenetwork/flare-periphery-contracts/songbird/ftso/userInterfaces/IFtsoRegistry.sol";
+// for testing
+// import "@flarenetwork/flare-periphery-contracts/coston2/ContractRegistry.sol";
+// import "@flarenetwork/flare-periphery-contracts/coston2/TestFtsoV2Interface.sol";
+import "@flarenetwork/flare-periphery-contracts/flare/ContractRegistry.sol";
+import "@flarenetwork/flare-periphery-contracts/flare/FtsoV2Interface.sol";
 
 /**
  *
@@ -35,61 +39,49 @@ contract UppercentNFTPass is
     ERC1155SupplyUpgradeable,
     UUPSUpgradeable
 {
+    TestFtsoV2Interface internal ftsoV2;
+    IERC1155 internal oldContract;
     //
     /**
      * Constant for token ID
      * @notice A new contract per course NFT passes
      * Hence token ID is fixed to '0'
      */
-    uint256 public constant TOKEN_ID = 0;
+    uint256 public constant TOKEN_ID = 1;
     string private constant TOKEN_SYMBOL = "SGB"; // for FTSO
+    bytes21 private constant FEED_ID = bytes21(0x01464c522f55534400000000000000000000000000); // FLR/USD
 
     // State variables for contract parameters
     uint256 private _maxSupply;
-    address private _creator;
+    uint256 private _remainingSupply;
     address private _admin;
     uint256 private _adminEarning;
-    uint256 private _creatorEarning;
     uint256 private _mintPrice;
     // Pre-sale state variable
     uint256 private _presaleMintPrice;
     uint256 private _presaleStartDate;
     uint256 private _presaleEndDate;
-    uint256 private _firstPresaleWindow;
-    uint256 private _presaleMaxSupply;
-    uint256 private _presaleTotalSupply;
     bool private _presaleCreated;
-    // Allow list state variables
-    uint256 private _allowListPrice;
-    uint256 private _allowListStartDate;
-    uint256 private _allowListEndDate;
-    uint256 private _allowListMaxLimit;
-    bool private _allowListExists;
-    uint256 private _totalReservedSupply;
-    uint256 private _allowListDeposit;
+
+    uint256 private _group1ReservedSupply;  // Reserved supply for Group 1
+    uint256 private _group1Minted;  // Track how much Group 1 has minted
+    uint256 private _group2Supply;  // Supply for Group 2
+    uint256 private _group2Minted;  // Track how much Group 2 has minted
 
     uint256 private _userMintLimit;
     address private constant FLARE_CONTRACT_REGISTRY =
         0xaD67FE66660Fb8dFE9d6b1b4240d8650e30F6019;
 
+    address private constant PREVIOUS_CONTRACT_ADDRESS = 0xF173c2111F700D485ED7e88CcC488DFF41a9D829;
+
     mapping(address => uint256) private earnings;
-    mapping(address => uint256) private allowListBalances;
-    mapping(address => uint256) private reservedNFTPasses;
 
     // Event for presale creation
     event PresaleCreated(
-        uint256 supply,
         uint256 price,
         uint256 startDate,
         uint256 endDate
     );
-    event AllowListCreated(
-        uint256 limit,
-        uint256 price,
-        uint256 startDate,
-        uint256 endDate
-    );
-    event AllowListSubscribed(address indexed account, uint256 amount);
 
     // Modifier to allow execution only once
     modifier onlyOnce() {
@@ -98,34 +90,18 @@ contract UppercentNFTPass is
         _presaleCreated = true;
     }
 
-    // Modifier to allow execution only during the first pre-sale window (default: 7 days) for allow-list users
-    modifier onlyDuringFirst7Days() {
-        require(
-            // Check if it's within the first pre-sale window and the sender is on the allow-list
-            (isFirstPresaleWindow() && reservedNFTPasses[msg.sender] > 0) ||
-                // Or if it's after the first pre-sale window
-                (isPresaleActive() &&
-                    (!allowListExits() ||
-                        block.timestamp >
-                        (_presaleStartDate + _firstPresaleWindow))),
-            "Error: First pre-sale window is for allowed list or no active pre-sale"
-        );
-        _;
-    }
-
     /**
      *
      * Initialize function to set up the contract parameters
      */
     function initialize(
         address owner,
-        address creator,
         uint256 adminEarning,
-        uint256 creatorEarning,
         string memory uri,
         uint256 maxSupply,
         uint256 mintPrice,
-        uint256 userMintLimit
+        uint256 userMintLimit,
+        uint256 group1ReservedSupply
     ) public initializer {
         // Initialize ERC1155 and other upgradeable contracts
         __ERC1155_init(uri);
@@ -137,15 +113,17 @@ contract UppercentNFTPass is
 
         // Set contract parameters
         _maxSupply = maxSupply;
+        _remainingSupply = maxSupply;
         _mintPrice = mintPrice; // $USD
-        _creator = creator;
         _admin = owner;
         _adminEarning = adminEarning;
-        _creatorEarning = creatorEarning;
         _userMintLimit = userMintLimit;
         _presaleCreated = false;
-        _allowListExists = false;
-        _firstPresaleWindow = 7 days;
+        ftsoV2 = ContractRegistry.getTestFtsoV2();
+        oldContract = IERC1155(PREVIOUS_CONTRACT_ADDRESS);
+        _group1ReservedSupply = group1ReservedSupply;
+        require(_group1ReservedSupply <= maxSupply, "Error: Invalid reserved supply");
+        _group2Supply = maxSupply - group1ReservedSupply;
     }
 
     /**
@@ -167,40 +145,12 @@ contract UppercentNFTPass is
     }
 
     /**
-     *
-     * Function to change creator address
-     */
-    function changeCreator(address newCreator) public onlyOwner {
-        // Check for address 0
-        require(newCreator != address(0), "Error: Invalid address");
-        _creator = newCreator;
-    }
-
-    /**
-     * @dev Function to update the percentage of earnings the creator should receive.
-     * @param percentage The percentage of earnings to be allocated to the creator.
-     */
-    function updateCreatorsShare(uint256 percentage) public onlyOwner {
-        // Check for address 0
-        require(percentage > 0, "Error: Invalid percentage");
-        require(
-            percentage + _adminEarning <= 100,
-            "Error: Cumulative share value can not be greater than 100"
-        );
-        _creatorEarning = percentage;
-    }
-
-    /**
      * @dev Function to update the percentage of earnings the admin should receive.
      * @param percentage The percentage of earnings to be allocated to the admin.
      */
     function updateAdminsShare(uint256 percentage) public onlyOwner {
         // Check for address 0
         require(percentage > 0, "Error: Invalid percentage");
-        require(
-            percentage + _creatorEarning <= 100,
-            "Error: Cumulative share value can not be greater than 100"
-        );
         _adminEarning = percentage;
     }
 
@@ -226,58 +176,51 @@ contract UppercentNFTPass is
      */
     function mint(uint256 amount) public payable {
         // Check various conditions before allowing minting
-        require(!isPresaleActive(), "Error: Pre-sale in Progress");
+        require(
+            _remainingSupply >= amount,
+            "Error: Exceeds maximum supply"
+        );
         require(
             amount <= getUserMintLimit(msg.sender, TOKEN_ID),
             "Error: Exceeds per-user limit"
         );
         require(
-            totalSupply(TOKEN_ID) + amount <=
-                maxAavailableSupply(msg.sender, _maxSupply),
-            "Error: Exceeds maximum supply"
-        );
-        require(
-            msg.value >= requiredMintAmount(amount, msg.sender),
+            msg.value >= requiredMintAmount(amount),
             "Error: Insufficient amount sent"
         );
-
-        adjustReservations(amount, msg.sender);
+        if (isPresaleActive()) {
+            if (oldContract.balanceOf(msg.sender, TOKEN_ID) > 0) {
+                _group1Minted += amount;
+            } else {
+                require(_group2Minted + amount <= _group2Supply, "Error: Exceeds available supply for Group 2 during presale");
+                _group2Minted += amount;
+            }
+        }
+        
         // Mint NFTs, transfer earnings, and update user's pass count
         _mint(msg.sender, TOKEN_ID, amount, "");
+        _remainingSupply -= amount;
     }
 
     /**
-     *
-     * Function to mint NFTs during pre-sale window
+     * @dev Function that allows the owner to mint the remaining supply of NFTs 
+     * and immediately burn them. Can only be called by the owner.
      */
-    function presaleMint(uint256 amount) public payable onlyDuringFirst7Days {
-        // Check various conditions before allowing minting
+    function mintAndBurnRemainingSupply() external onlyOwner {
+        uint256 remainingSupply = _maxSupply - totalSupply(TOKEN_ID);
+        require(remainingSupply > 0, "Error: No remaining supply to mint and burn");
 
-        require(isPresaleActive(), "Error: No active pre-sale");
-        require(
-            totalSupply(TOKEN_ID) + amount <=
-                maxAavailableSupply(msg.sender, _maxSupply),
-            "Error: Exceeds maximum supply"
-        );
-        require(
-            _presaleTotalSupply + amount <=
-                maxAavailableSupply(msg.sender, _presaleMaxSupply),
-            "Error: Exceeds pre-sale supply"
-        );
-        require(
-            amount <= getUserMintLimit(msg.sender, TOKEN_ID),
-            "Error: Exceeds per-user limit"
-        );
-        require(
-            msg.value >= requiredMintAmount(amount, msg.sender),
-            "Error: Insufficient amount sent"
-        );
+        // Mint remaining supply to the owner's address
+        _mint(msg.sender, TOKEN_ID, remainingSupply, "");
 
-        adjustReservations(amount, msg.sender);
-        _presaleTotalSupply += amount;
+        // Burn the minted tokens immediately
+        _burn(msg.sender, TOKEN_ID, remainingSupply);
 
-        // Mint NFTs, transfer earnings, and update user's pass count
-        _mint(msg.sender, TOKEN_ID, amount, "");
+        _remainingSupply = 0;
+    }
+
+    function getRemainingSupply() public view returns (uint256) {
+        return _remainingSupply;
     }
 
     /**
@@ -286,77 +229,52 @@ contract UppercentNFTPass is
      * It can be be called only once
      */
     function createPresale(
-        uint256 supply,
         uint256 price,
         uint256 startDate,
         uint256 endDate
     ) public onlyOwner onlyOnce {
-        require(
-            totalSupply(TOKEN_ID) + supply <= _maxSupply,
-            "Error: Presale supply exceeds max supply"
-        );
         require(price > 0, "Error: Presale price must be greater than zero");
         require(
-            startDate > block.timestamp,
+            startDate >= block.timestamp,
             "Error: Start date can not be set to past date"
         );
         require(startDate < endDate, "Error: Invalid presale dates");
 
         // Set presale parameters
-        _presaleMaxSupply = supply;
         _presaleMintPrice = price; // $USD
         _presaleStartDate = startDate;
         _presaleEndDate = endDate;
 
         // Emit event for presale creation
-        emit PresaleCreated(supply, price, startDate, endDate);
+        emit PresaleCreated(price, startDate, endDate);
     }
 
     /**
      *
-     * Function for the owner to release and withdraw funds to the admin and creator
+     * Function for the owner to release and withdraw funds to the admin
      */
     function releaseFunds() public onlyOwner {
-        // Calculate admin and creator shares
+        // Calculate admin shares
         uint256 adminShare = (address(this).balance * _adminEarning) / 100;
-        uint256 creatorShare = (address(this).balance * _creatorEarning) / 100;
 
         // Record earnings
         earnings[_admin] += adminShare;
-        earnings[_creator] += creatorShare;
 
-        // Transfer funds to admin and creator
+        // Transfer funds to admin
         payable(_admin).transfer(adminShare);
-        payable(_creator).transfer(creatorShare);
     }
 
     /**
      * Function that calculates required mint amount to mint NFT pass
      * @ amount is number of NFTs
-     * @ account is wallet address
      */
     function requiredMintAmount(
-        uint256 amount,
-        address account
+        uint256 amount
     ) public view virtual returns (uint256) {
         uint256 mintPrice = getMintPrice();
-        uint256 discountedPrice = mintPrice - _allowListPrice;
-        uint256 reqAmount;
+        uint256 reqAmount = mintPrice * amount;
 
-        if (reservedNFTPasses[account] > 0 && amount > 0) {
-            uint256 reservedPasses = min(amount, reservedNFTPasses[account]);
-            uint256 regularPasses = amount - reservedPasses;
-
-            reqAmount =
-                discountedPrice *
-                reservedPasses +
-                mintPrice *
-                regularPasses;
-        } else {
-            reqAmount = mintPrice * amount;
-        }
-
-        return dollarToWei(TOKEN_SYMBOL, reqAmount);
+        return dollarToWei(reqAmount);
     }
 
     /**
@@ -367,26 +285,6 @@ contract UppercentNFTPass is
     }
 
     /**
-     * max unlocked supply for regular minting
-     * @ account is the sender wallet address
-     */
-    function maxAavailableSupply(
-        address account,
-        uint256 supply
-    ) internal view returns (uint256) {
-        uint256 totalReservedSupply = _totalReservedSupply;
-        uint256 userReserved = reservedNFTPasses[account];
-        // reservations are void after 7 days of pre-sale
-        if (!isFirstPresaleWindow()) {
-            totalReservedSupply = 0;
-            userReserved = 0;
-        }
-        uint256 _maxAavailable = supply - totalReservedSupply;
-        uint256 _availableForUser = _maxAavailable + userReserved;
-        return _availableForUser;
-    }
-
-    /**
      *
      * Function to check if presale is active
      */
@@ -394,16 +292,6 @@ contract UppercentNFTPass is
         return
             block.timestamp >= _presaleStartDate &&
             block.timestamp <= _presaleEndDate;
-    }
-
-    /**
-     * returns true during first pre-sale window (default: 7 days)
-     */
-    function isFirstPresaleWindow() public view virtual returns (bool) {
-        return (isPresaleActive() &&
-            allowListExits() &&
-            block.timestamp >= _presaleStartDate &&
-            block.timestamp <= (_presaleStartDate + _firstPresaleWindow));
     }
 
     /**
@@ -431,13 +319,6 @@ contract UppercentNFTPass is
     }
 
     /**
-     * Get creator address
-     */
-    function getCreator() public view virtual returns (address) {
-        return _creator;
-    }
-
-    /**
      *
      * Get admin share
      */
@@ -447,15 +328,7 @@ contract UppercentNFTPass is
 
     /**
      *
-     * Get creator share
-     */
-    function getCreatorShare() public view virtual returns (uint256) {
-        return _creatorEarning;
-    }
-
-    /**
-     *
-     * Get creator & admin earnings
+     * Get admin earnings
      */
     function getEarnings(
         address account
@@ -490,22 +363,6 @@ contract UppercentNFTPass is
 
     /**
      *
-     * Get pre-sale maximum supply
-     */
-    function getPresaleMaxSupply() public view virtual returns (uint256) {
-        return _presaleMaxSupply;
-    }
-
-    /**
-     *
-     * Get pre-sale total supply
-     */
-    function getPresaleTotalSupply() public view virtual returns (uint256) {
-        return _presaleTotalSupply;
-    }
-
-    /**
-     *
      * Get per user mint limit
      */
     function getUserMintLimit(
@@ -519,247 +376,50 @@ contract UppercentNFTPass is
      *
      * FTSO Integration
      */
-    function getTokenPriceWei(
-        string memory _symbol
-    )
+    function getTokenPriceWei()
         public
         view
-        returns (uint256 _price, uint256 _timestamp, uint256 _decimals)
+        returns (uint256 _price, int8 _decimals, uint64 _timestamp)
     {
-        // 2. Access the Contract Registry
-        IFlareContractRegistry contractRegistry = IFlareContractRegistry(
-            FLARE_CONTRACT_REGISTRY
-        );
-
-        // 3. Retrieve the FTSO Registry
-        IFtsoRegistry ftsoRegistry = IFtsoRegistry(
-            contractRegistry.getContractAddressByName("FtsoRegistry")
-        );
-
-        // 4. Get latest price
-        (_price, _timestamp, _decimals) = ftsoRegistry
-            .getCurrentPriceWithDecimals(_symbol);
+        (_price, _decimals, _timestamp) = ftsoV2.getFeedById(FEED_ID);
     }
 
     /**
      * Convert wei to dollar
      */
     function weiToDollar(
-        string memory _symbol,
         uint256 _amount
     ) public view returns (uint256 _price) {
-        uint256 _timestamp;
-        uint256 _decimals;
-        (_price, _timestamp, _decimals) = getTokenPriceWei(_symbol);
-        return uint256((_price * _amount) / (10 ** (18 + _decimals)));
+        uint64 _timestamp;
+        int8 _decimals; // int8 since the getFeedById function uses int8 for decimals
+        (_price, _decimals, _timestamp) = getTokenPriceWei();
+        // Ensure _decimals is positive before casting to uint256
+        require(_decimals >= 0, "Decimals must be non-negative");
+
+        // Convert _decimals to uint256 for safe arithmetic
+        uint256 decimals = uint256(int256(_decimals));
+
+        // Adjusting for the decimal places returned by getFeedById
+        return uint256((_price * _amount) / (10 ** (18 + decimals)));
     }
 
     /**
      * Convert dollar to wei
      */
     function dollarToWei(
-        string memory _symbol,
         uint256 _amount
     ) public view returns (uint256 _price) {
         uint256 _timestamp;
-        uint256 _decimals;
-        (_price, _timestamp, _decimals) = getTokenPriceWei(_symbol);
-        return uint256((_amount * (10 ** (18 + _decimals))) / _price);
-    }
+        int8 _decimals; // int8 since the getFeedById function uses int8 for decimals
+        (_price, _decimals, _timestamp) = getTokenPriceWei();
+        // Ensure _decimals is positive before casting to uint256
+        require(_decimals >= 0, "Decimals must be non-negative");
 
-    /////////////////////////////////////////////////////////
-    //     ___    ____                 __    _      __     //
-    //    /   |  / / /___ _      __   / /   (_)____/ /_    //
-    //   / /| | / / / __ \ | /| / /  / /   / / ___/ __/    //
-    //  / ___ |/ / / /_/ / |/ |/ /  / /___/ (__  ) /_      //
-    // /_/  |_/_/_/\____/|__/|__/  /_____/_/____/\__/      //
-    //                                                     //
-    /////////////////////////////////////////////////////////
+        // Convert _decimals to uint256 for safe arithmetic
+        uint256 decimals = uint256(int256(_decimals));
 
-    /**
-     *
-     * Function for the owner to set an allow list
-     */
-    function setAllowList(
-        uint256 limit,
-        uint256 price,
-        uint256 startDate,
-        uint256 endDate
-    ) public onlyOwner {
-        require(!allowListExits(), "Error: Allow list exists");
-        require(
-            !isPresaleActive(),
-            "Error: No Allow list when pre-sale is active"
-        );
-        require(
-            totalSupply(TOKEN_ID) + limit <= _maxSupply,
-            "Error: Allow list supply exceeds max supply"
-        );
-        require(price > 0, "Error: Price must be greater than zero");
-        require(
-            startDate > block.timestamp,
-            "Error: Start date can not be set to past date"
-        );
-        require(startDate < endDate, "Error: Invalid dates");
-
-        // Set presale parameters
-        _allowListMaxLimit = limit;
-        _allowListPrice = price; // $USD
-        _allowListStartDate = startDate;
-        _allowListEndDate = endDate;
-        _allowListExists = true;
-
-        // Emit event for allow list creation
-        emit AllowListCreated(limit, price, startDate, endDate);
-    }
-
-    /**
-     *
-     * set first presale window (default is 7 days)
-     */
-    function setFirstPresaleWindow(
-        uint256 firstPresaleWindow
-    ) public onlyOwner {
-        require(
-            firstPresaleWindow > 0 && firstPresaleWindow <= _presaleEndDate,
-            "Error: Invalid first pre-sale window"
-        );
-        _firstPresaleWindow = firstPresaleWindow;
-    }
-
-    /**
-     *
-     * Function for the users to subscribe to an allow list
-     */
-    function subscribeAllowList(uint256 amount) public payable {
-        uint256 userLimit = _userMintLimit - reservedNFTPasses[msg.sender];
-        require(
-            allowListExits() && isAllowListActive(),
-            "Error: No allow list exists"
-        );
-        require(
-            !isPresaleActive(),
-            "Error: Cannot subscribe when pre-sale is live"
-        );
-        require(amount > 0, "Error: Subscribe to at least 1 NFT pass");
-        require(
-            amount <= (_allowListMaxLimit - _totalReservedSupply),
-            "Error: Exceeds maximum allowed list limit"
-        );
-        require(amount <= userLimit, "Error: Exceeds per-user limit");
-        require(
-            msg.value >= dollarToWei(TOKEN_SYMBOL, _allowListPrice * amount),
-            "Error: Insufficient amount sent"
-        );
-
-        allowListBalances[msg.sender] += msg.value;
-        reservedNFTPasses[msg.sender] += amount;
-        _totalReservedSupply += amount;
-        _allowListDeposit += msg.value;
-
-        // Emit event for allow list subscription
-        emit AllowListSubscribed(msg.sender, amount);
-    }
-
-    /**
-     * Adjust NFT passes reservations
-     */
-    function adjustReservations(uint256 amount, address sender) internal {
-        uint256 reservedPasses = min(amount, reservedNFTPasses[sender]);
-        reservedNFTPasses[sender] -= reservedPasses;
-        _totalReservedSupply -= reservedPasses;
-    }
-
-    /**
-     *
-     * Function to check if allow list exists
-     */
-    function allowListExits() public view virtual returns (bool) {
-        return _allowListExists;
-    }
-
-    /**
-     *
-     * Function to check if allow list is active
-     */
-    function isAllowListActive() public view virtual returns (bool) {
-        return
-            block.timestamp >= _allowListStartDate &&
-            block.timestamp <= _allowListEndDate;
-    }
-
-    /**
-     * Returns supply of total reserved NFT passes
-     */
-    function getTotalReservedPasses() public view virtual returns (uint256) {
-        return
-            (isPresaleCreated() &&
-                block.timestamp > (_presaleStartDate + _firstPresaleWindow))
-                ? 0
-                : _totalReservedSupply;
-    }
-
-    /**
-     * Returns user reserved NFT passes
-     */
-    function getUserReservedPasses(
-        address account
-    ) public view virtual returns (uint256) {
-        return
-            (isPresaleCreated() &&
-                block.timestamp > (_presaleStartDate + _firstPresaleWindow))
-                ? 0
-                : reservedNFTPasses[account];
-    }
-
-    /**
-     * Returns total deposit for allow list
-     */
-    function getAllowListDeposit() public view virtual returns (uint256) {
-        return _allowListDeposit;
-    }
-
-    /**
-     * Returns max limit for allow list
-     */
-    function getAllowListMaxLimit() public view virtual returns (uint256) {
-        return _allowListMaxLimit;
-    }
-
-    /**
-     * Returns allow list price
-     */
-    function getAllowListPrice() public view virtual returns (uint256) {
-        return _allowListPrice;
-    }
-
-    /**
-     * Returns start date of allow list
-     */
-    function getAllowListStartDate() public view virtual returns (uint256) {
-        return _allowListStartDate;
-    }
-
-    /**
-     * Returns end date of allow list
-     */
-    function getAllowListEndDate() public view virtual returns (uint256) {
-        return _allowListEndDate;
-    }
-
-    /**
-     * Return first presale window (exclusive for allow listed users)
-     */
-    function getFirstPresaleWindow() public view virtual returns (uint256) {
-        return _firstPresaleWindow;
-    }
-
-    /**
-     *
-     * Function to close allow list window
-     */
-    function closeAllowList() public onlyOwner {
-        _allowListEndDate = block.timestamp;
+        // Adjusting for the decimal places returned by getFeedById
+        return uint256((_amount * (10 ** (18 + decimals))) / _price);
     }
 
     function _authorizeUpgrade(

@@ -1,14 +1,15 @@
-require("@nomicfoundation/hardhat-toolbox");
-require('@openzeppelin/hardhat-upgrades');
+import { HardhatUserConfig, vars } from "hardhat/config";
+import "@nomicfoundation/hardhat-toolbox";
+import "@openzeppelin/hardhat-upgrades";
 
-const { infuraKey, privateKey, etherscanKey } = require('./credentials.json');
+const privateKey = vars.get("WALLET_KEY");
 
-module.exports = {
+const config: HardhatUserConfig = {
   networks: {
     coston: {
       url: "https://coston-api.flare.network/ext/bc/C/rpc",
       accounts: [privateKey],
-      chainId: 16
+      chainId: 16,
     },
     coston2: {
       url: "https://coston2-api.flare.network/ext/bc/C/rpc",
@@ -18,7 +19,7 @@ module.exports = {
     songbird: {
       url: "https://songbird-api.flare.network/ext/bc/C/rpc",
       accounts: [privateKey],
-      chainId: 19
+      chainId: 19,
     },
     flare: {
       url: "https://flare-api.flare.network/ext/bc/C/rpc",
@@ -27,12 +28,17 @@ module.exports = {
     },
     polygon_mumbai: {
       url: "https://rpc-mumbai.maticvigil.com",
-      accounts: [privateKey]
-    }
+      accounts: [privateKey],
+    },
+    hardhat: {
+      forking: {
+        url: "https://flare-api.flare.network/ext/C/rpc?x-apikey=4c56de23-853c-478b-83a6-dafb3ab0f44e",
+      },
+    },
   },
   etherscan: {
     apiKey: {
-      songbird: [etherscanKey]
+      songbird: "api-key",
     },
     customChains: [
       {
@@ -40,10 +46,10 @@ module.exports = {
         chainId: 19,
         urls: {
           apiURL: "https://songbird-explorer.flare.network/api",
-          browserURL: "https://songbird-explorer.flare.network/"
-        }
-      }
-    ]
+          browserURL: "https://songbird-explorer.flare.network/",
+        },
+      },
+    ],
   },
   sourcify: {
     enabled: true,
@@ -56,8 +62,10 @@ module.exports = {
       evmVersion: "london",
       optimizer: {
         enabled: true,
-        runs: 200
-      }
-    }
-  }
+        runs: 200,
+      },
+    },
+  },
 };
+
+export default config;

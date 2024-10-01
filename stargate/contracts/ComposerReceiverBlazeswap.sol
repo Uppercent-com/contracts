@@ -4,17 +4,17 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { ILayerZeroComposer } from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ILayerZeroComposer.sol";
 import { OFTComposeMsgCodec } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/libs/OFTComposeMsgCodec.sol";
 
-import { IMockAMM } from './interfaces/IMockAMM.sol';
+import { IBlazeSwapRouter } from "@blazeswap/contracts/contracts/periphery/interfaces/IBlazeSwapRouter.sol";
 
-contract ComposerReceiverAMM is ILayerZeroComposer {
-    IMockAMM public immutable amm;
+contract ComposerReceiverBlazeswap is ILayerZeroComposer {
+    IBlazeSwapRouter public immutable blazeswapRouter;
     address public immutable endpoint;
     address public immutable stargate;
 
     event ReceivedOnDestination(address token);
 
-    constructor(address _amm, address _endpoint, address _stargate) {
-        amm = IMockAMM(_amm);
+    constructor(address _blazeswapRouter, address _endpoint, address _stargate) {
+        blazeswapRouter = IBlazeSwapRouter(_blazeswapRouter);
         endpoint = _endpoint;
         stargate = _stargate;
     }
@@ -39,9 +39,9 @@ contract ComposerReceiverAMM is ILayerZeroComposer {
         path[0] = _oftOnDestination;
         path[1] = _tokenOut;
 
-        IERC20(_oftOnDestination).approve(address(amm), amountLD);
+        IERC20(_oftOnDestination).approve(address(blazeswapRouter), amountLD);
 
-        try amm.swapExactTokensForTokens(
+        try blazeswapRouter.swapExactTokensForNAT(
             amountLD,
             _amountOutMinDest,
             path,  

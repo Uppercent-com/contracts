@@ -5,18 +5,32 @@ import { ILayerZeroComposer } from "@layerzerolabs/lz-evm-protocol-v2/contracts/
 import { OFTComposeMsgCodec } from "@layerzerolabs/lz-evm-oapp-v2/contracts/oft/libs/OFTComposeMsgCodec.sol";
 
 import { IBlazeSwapRouter } from "@blazeswap/contracts/contracts/periphery/interfaces/IBlazeSwapRouter.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract ComposerReceiverBlazeswap is ILayerZeroComposer {
+contract ComposerReceiverBlazeswap is ILayerZeroComposer, Ownable {
     IBlazeSwapRouter public immutable blazeswapRouter;
     address public immutable endpoint;
-    address public immutable stargate;
+    address[3] public stargateAddresses;
 
     event ReceivedOnDestination(address token);
 
-    constructor(address _blazeswapRouter, address _endpoint, address _stargate) {
+    constructor(
+        address _blazeswapRouter, 
+        address _endpoint, 
+        address[3] memory _stargateAddresses
+    ) Ownable(msg.sender) {
         blazeswapRouter = IBlazeSwapRouter(_blazeswapRouter);
         endpoint = _endpoint;
-        stargate = _stargate;
+        stargateAddresses = _stargateAddresses;
+    }
+
+    function isStargateAddress(address _from) internal view returns (bool) {
+        for (uint i = 0; i < stargateAddresses.length; i++) {
+            if (_from == stargateAddresses[i]) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function lzCompose(
@@ -26,7 +40,7 @@ contract ComposerReceiverBlazeswap is ILayerZeroComposer {
         address _executor,
         bytes calldata _extraData
     ) external payable {
-        require(_from == stargate, "!stargate");
+        require(isStargateAddress(_from), "!stargate");
         require(msg.sender == endpoint, "!endpoint");
 
         uint256 amountLD = OFTComposeMsgCodec.amountLD(_message);
@@ -53,6 +67,11 @@ contract ComposerReceiverBlazeswap is ILayerZeroComposer {
             IERC20(_oftOnDestination).transfer(_tokenReceiver, amountLD);
             emit ReceivedOnDestination(_oftOnDestination);
         }
+    }
+
+    function adminWithdrawTokens(address _token, uint256 _amount) external onlyOwner {
+        require(_amount > 0, "Amount must be greater than zero");
+        IERC20(_token).transfer(owner(), _amount);
     }
 
     fallback() external payable {}

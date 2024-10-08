@@ -22,7 +22,7 @@ const config: HardhatUserConfig = {
       chainId: 19,
     },
     flare: {
-      url: "https://flare-api.flare.network/ext/bc/C/rpc",
+      url: "https://flare-api.flare.network/ext/C/rpc?x-apikey=4c56de23-853c-478b-83a6-dafb3ab0f44e",
       accounts: [privateKey],
       chainId: 14,
     },
@@ -39,6 +39,7 @@ const config: HardhatUserConfig = {
   etherscan: {
     apiKey: {
       songbird: "api-key",
+      flare: "4c56de23-853c-478b-83a6-dafb3ab0f44e",
     },
     customChains: [
       {
@@ -47,6 +48,14 @@ const config: HardhatUserConfig = {
         urls: {
           apiURL: "https://songbird-explorer.flare.network/api",
           browserURL: "https://songbird-explorer.flare.network/",
+        },
+      },
+      {
+        network: "flare",
+        chainId: 14,
+        urls: {
+          apiURL: "https://flare-explorer.flare.network/api",
+          browserURL: "https://flare-explorer.flare.network/",
         },
       },
     ],

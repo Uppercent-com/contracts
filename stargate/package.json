@@ -1,0 +1,25 @@
+{
+  "name": "uppercent",
+  "version": "1.0.0",
+  "description": "ERC1155 Smart Contract to build NFT Passes for Uppercent",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ERC1155"
+  ],
+  "author": "Novvr Technologies",
+  "license": "ISC",
+  "devDependencies": {
+    "hardhat": "^2.19.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.2"
+  },
+  "dependencies": {
+    "@blazeswap/contracts": "^1.1.0",
+    "@layerzerolabs/lz-evm-oapp-v2": "^2.3.45-oft-rc.0",
+    "@layerzerolabs/lz-evm-protocol-v2": "^2.3.45-oft-rc.0",
+    "@openzeppelin/contracts": "^5.0.2"
+  }
+}

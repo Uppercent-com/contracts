@@ -174,7 +174,7 @@ contract UppercentNFTPass is
      *
      * Function to mint NFTs at standard minting price
      */
-    function mint(uint256 amount) public payable {
+    function mint(uint256 amount) public payable whenNotPaused {
         // Check various conditions before allowing minting
         require(
             _remainingSupply >= amount,
